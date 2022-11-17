@@ -13,26 +13,19 @@ addCommandAlias(
 // Reload build.sbt on changes
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
-val SCALA_2_12          = "2.12.16"
-val SCALA_2_13          = "2.13.8"
-val SCALA_3_0           = "3.1.2"
-val targetScalaVersions = SCALA_2_13 :: SCALA_2_12 :: Nil
-val withDotty           = SCALA_3_0 :: targetScalaVersions
+val SCALA_2_12          = "2.12.17"
+val SCALA_2_13          = "2.13.10"
+val SCALA_3_0           = "3.2.1"
+val targetScalaVersions = SCALA_3_0 :: SCALA_2_13 :: SCALA_2_12 :: Nil
 
-val SCALACHECK_VERSION           = "1.16.0"
+val SCALACHECK_VERSION           = "1.17.0"
 val JS_JAVA_LOGGING_VERSION      = "1.0.0"
 val JAVAX_ANNOTATION_API_VERSION = "1.3.2"
-
-// A build configuration switch for working on Dotty migration. This needs to be removed eventually
-val DOTTY = sys.env.isDefinedAt("DOTTY")
 
 ThisBuild / usePipelining := false
 
 // We MUST use Scala 2.12 for building sbt-airframe
-ThisBuild / scalaVersion := {
-  if (DOTTY) SCALA_3_0
-  else SCALA_2_13
-}
+ThisBuild / scalaVersion := SCALA_2_13
 
 ThisBuild / organization := "org.wvlet.airframe"
 
@@ -97,7 +90,7 @@ val buildSettings = Seq[Setting[_]](
     if (scalaVersion.value.startsWith("3."))
       Seq.empty
     else
-      Seq("org.scala-lang.modules" %%% "scala-collection-compat" % "2.7.0")
+      Seq("org.scala-lang.modules" %%% "scala-collection-compat" % "2.8.1")
   }
 )
 
@@ -220,7 +213,7 @@ lazy val airspecLog =
       airspecJVMBuildSettings,
       libraryDependencies ++= Seq(
         // For rotating log files
-        "ch.qos.logback" % "logback-core" % "1.2.11"
+        "ch.qos.logback" % "logback-core" % "1.3.4"
       )
     )
     .jsSettings(
@@ -355,7 +348,7 @@ lazy val airspec =
         ("org.scala-js"        %% "scalajs-test-interface" % scalaJSVersion).cross(CrossVersion.for3Use2_13),
         ("org.portable-scala" %%% "portable-scala-reflect" % "1.1.2").cross(CrossVersion.for3Use2_13),
         // Necessary for async testing
-        "org.scala-js" %%% "scala-js-macrotask-executor" % "1.0.0"
+        "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.0"
       )
     )
     // This should be Optional dependency, but using Provided dependency for bloop which doesn't support Optional.

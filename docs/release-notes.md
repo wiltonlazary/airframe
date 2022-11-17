@@ -6,6 +6,246 @@ title: Release Notes
 
 Airframe uses YY.MM.patch versioning scheme, so the version numbers match with the release year and month.   
 
+## 22.11.1
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.11.1)
+
+## 22.11.0
+
+This version upgrades slf4j to 2.0.x series. No application code change is necessary, but 
+if you are using an slf4j binder, the binder needs to be upgraded to the version that support slf4j-api 2.0.x. 
+See [slf4j FAQ](https://www.slf4j.org/faq.html#changesInVersion200) for more details.
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.11.0)
+
+## 22.10.4
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.10.4)
+
+## 22.10.3
+
+This version upgrades to Scala 3.2.1 for Scala 2.13.10 compatibility through TASTy reader.
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.10.3)
+
+## 22.10.2
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.10.2)
+
+## 22.10.1
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.10.1)
+
+## 22.10.0
+
+Upgrade to Scala 2.13.10 to address [a regression in Scala 2.13.9](https://github.com/scala/scala/pull/10155).
+And also, an experimental module airframe-http-netty is added to support REST/RPC server in Scala 3.
+
+- Update fluency-core, fluency-fluentd, ... to 2.7.0 ([#2458](https://github.com/wvlet/airframe/issues/2458)) [[f4982c6f0](https://github.com/wvlet/airframe/commit/f4982c6f0)]
+- Update grpc-netty-shaded, grpc-protobuf, ... to 1.50.0 ([#2485](https://github.com/wvlet/airframe/issues/2485)) [[024fea0b6](https://github.com/wvlet/airframe/commit/024fea0b6)]
+- Update protobuf-java to 3.21.8 ([#2484](https://github.com/wvlet/airframe/issues/2484)) [[3ca772199](https://github.com/wvlet/airframe/commit/3ca772199)]
+- Upgrade to logback-core 1.3.4 ([#2483](https://github.com/wvlet/airframe/issues/2483)) [[d7263e53a](https://github.com/wvlet/airframe/commit/d7263e53a)]
+- Update auth to 2.17.293 ([#2481](https://github.com/wvlet/airframe/issues/2481)) [[e59cf9ad3](https://github.com/wvlet/airframe/commit/e59cf9ad3)]
+- Update scala-compiler, scala-library, ... to 2.13.10 ([#2476](https://github.com/wvlet/airframe/issues/2476)) [[e4bc9684a](https://github.com/wvlet/airframe/commit/e4bc9684a)]
+- Update sbt-scoverage to 2.0.5 ([#2480](https://github.com/wvlet/airframe/issues/2480)) [[ab681912a](https://github.com/wvlet/airframe/commit/ab681912a)]
+- Update scalafmt-core to 3.6.0 ([#2479](https://github.com/wvlet/airframe/issues/2479)) [[833afd613](https://github.com/wvlet/airframe/commit/833afd613)]
+- Update sbt-mdoc to 2.3.6 ([#2478](https://github.com/wvlet/airframe/issues/2478)) [[d2809f4a7](https://github.com/wvlet/airframe/commit/d2809f4a7)]
+- Update sbt, sbt-dependency-tree, ... to 1.7.2 ([#2477](https://github.com/wvlet/airframe/issues/2477)) [[969aa7b2d](https://github.com/wvlet/airframe/commit/969aa7b2d)]
+- Update trino-main to 400 ([#2475](https://github.com/wvlet/airframe/issues/2475)) [[dcd91c32a](https://github.com/wvlet/airframe/commit/dcd91c32a)]
+- Update swagger-parser to 2.1.5 ([#2474](https://github.com/wvlet/airframe/issues/2474)) [[46646185b](https://github.com/wvlet/airframe/commit/46646185b)]
+- Remove unnecessary scala-steward PR labels ([#2482](https://github.com/wvlet/airframe/issues/2482)) [[c7ca2cf1b](https://github.com/wvlet/airframe/commit/c7ca2cf1b)]
+- Update netty-all to 4.1.84.Final ([#2473](https://github.com/wvlet/airframe/issues/2473)) [[6513cd85e](https://github.com/wvlet/airframe/commit/6513cd85e)]
+- Update grpc-netty-shaded, grpc-protobuf, ... to 1.49.2 ([#2472](https://github.com/wvlet/airframe/issues/2472)) [[5c9538aba](https://github.com/wvlet/airframe/commit/5c9538aba)]
+- Bump codecov/codecov-action from 1 to 3 ([#2469](https://github.com/wvlet/airframe/issues/2469)) [[73a073146](https://github.com/wvlet/airframe/commit/73a073146)]
+- Bump actions/upload-artifact from 1 to 3 ([#2470](https://github.com/wvlet/airframe/issues/2470)) [[0b48cf403](https://github.com/wvlet/airframe/commit/0b48cf403)]
+- Enable Dependabot for enabling Github Action updates ([#2468](https://github.com/wvlet/airframe/issues/2468)) [[bdf3c2267](https://github.com/wvlet/airframe/commit/bdf3c2267)]
+- Upgrade to checkout@v3, setup-java@v3, setup-node@v3, action-junit-report@v3 ([#2466](https://github.com/wvlet/airframe/issues/2466)) [[0e8312cf8](https://github.com/wvlet/airframe/commit/0e8312cf8)]
+- Fix MatchError in excluding pseudo headers of JDK's http client ([#2467](https://github.com/wvlet/airframe/issues/2467)) [[64a5e7626](https://github.com/wvlet/airframe/commit/64a5e7626)]
+- Exclude pseudo headers from response of JDK's http client ([#2465](https://github.com/wvlet/airframe/issues/2465)) [[5067e85d3](https://github.com/wvlet/airframe/commit/5067e85d3)]
+- Registered MBean doesn't have any attributes ([#2464](https://github.com/wvlet/airframe/issues/2464)) [[c035218a8](https://github.com/wvlet/airframe/commit/c035218a8)]
+- airframe-netty: Performance optimziation ([#2462](https://github.com/wvlet/airframe/issues/2462)) [[9514866f8](https://github.com/wvlet/airframe/commit/9514866f8)]
+- airframe-http-netty: Add an experimental Netty-backed HTTP server implementation ([#2460](https://github.com/wvlet/airframe/issues/2460)) [[41b2ca7fb](https://github.com/wvlet/airframe/commit/41b2ca7fb)]
+- Update trino-main to 398 ([#2457](https://github.com/wvlet/airframe/issues/2457)) [[18c9331c2](https://github.com/wvlet/airframe/commit/18c9331c2)]
+- Update protobuf-java to 3.21.7 ([#2456](https://github.com/wvlet/airframe/issues/2456)) [[2c591b1b4](https://github.com/wvlet/airframe/commit/2c591b1b4)]
+- Update json4s-jackson to 4.0.6 ([#2455](https://github.com/wvlet/airframe/issues/2455)) [[71f239ac4](https://github.com/wvlet/airframe/commit/71f239ac4)]
+- Update airframe-codec, airframe-control, ... to 22.9.3 ([#2453](https://github.com/wvlet/airframe/issues/2453)) [[307eee124](https://github.com/wvlet/airframe/commit/307eee124)]
+
+## 22.9.3
+
+This version includes JDK19 support for Scala 2.13 and several bug fixes. 
+
+- airframe-rpc: Use a short class name when an RPC path prefix is given ([#2452](https://github.com/wvlet/airframe/issues/2452)) [[c73aa46fe](https://github.com/wvlet/airframe/commit/c73aa46fe)]
+- airspec: Fixes [#2370](https://github.com/wvlet/airframe/issues/2370). Support running specs extending objects ([#2446](https://github.com/wvlet/airframe/issues/2446)) [[c9352ab76](https://github.com/wvlet/airframe/commit/c9352ab76)]
+- airspec: Show exceptions during test class initialization failures ([#2445](https://github.com/wvlet/airframe/issues/2445)) [[375d3e200](https://github.com/wvlet/airframe/commit/375d3e200)]
+- Add JDK19 support CI ([#2448](https://github.com/wvlet/airframe/issues/2448)) [[14b663873](https://github.com/wvlet/airframe/commit/14b663873)]
+- airframe-http: Add RPCStatus.fromHttpStatus(http status) ([#2444](https://github.com/wvlet/airframe/issues/2444)) [[0ebae131b](https://github.com/wvlet/airframe/commit/0ebae131b)]
+- Update sbt-mdoc to 2.3.5 ([#2451](https://github.com/wvlet/airframe/issues/2451)) [[17324b7a3](https://github.com/wvlet/airframe/commit/17324b7a3)]
+- Update swagger-parser to 2.1.3 ([#2450](https://github.com/wvlet/airframe/issues/2450)) [[320c551ca](https://github.com/wvlet/airframe/commit/320c551ca)]
+- Update AirSpec developer doc [[2573061ec](https://github.com/wvlet/airframe/commit/2573061ec)]
+- Update snakeyaml to 1.33 ([#2447](https://github.com/wvlet/airframe/issues/2447)) [[15fea6947](https://github.com/wvlet/airframe/commit/15fea6947)]
+- airframe-surface: [#2442](https://github.com/wvlet/airframe/issues/2442) Support special symbols (-, +, =) in quoted params ([#2443](https://github.com/wvlet/airframe/issues/2443)) [[dcbf70948](https://github.com/wvlet/airframe/commit/dcbf70948)]
+- Update airframe-rpc.md [[8d3356c0c](https://github.com/wvlet/airframe/commit/8d3356c0c)]
+- Update sbt-mdoc to 2.3.4 ([#2441](https://github.com/wvlet/airframe/issues/2441)) [[505e04306](https://github.com/wvlet/airframe/commit/505e04306)]
+- Update scala-compiler, scala-library, ... to 2.13.9 ([#2439](https://github.com/wvlet/airframe/issues/2439)) [[fc9e92c64](https://github.com/wvlet/airframe/commit/fc9e92c64)]
+- Update trino-main to 397 ([#2438](https://github.com/wvlet/airframe/issues/2438)) [[14513fa90](https://github.com/wvlet/airframe/commit/14513fa90)]
+- Update sbt-scoverage to 2.0.4 ([#2433](https://github.com/wvlet/airframe/issues/2433)) [[f86d2689e](https://github.com/wvlet/airframe/commit/f86d2689e)]
+- airframe-finagle: Toward Scala 3 support ([#2432](https://github.com/wvlet/airframe/issues/2432)) [[bcc942310](https://github.com/wvlet/airframe/commit/bcc942310)]
+- Support Scala 3 cross-build ([#2431](https://github.com/wvlet/airframe/issues/2431)) [[f8c95bfd0](https://github.com/wvlet/airframe/commit/f8c95bfd0)]
+- Update sbt-airframe to 22.9.2 ([#2429](https://github.com/wvlet/airframe/issues/2429)) [[bc52a0dcb](https://github.com/wvlet/airframe/commit/bc52a0dcb)]
+- Update airframe-codec, airframe-control, ... to 22.9.2 ([#2428](https://github.com/wvlet/airframe/issues/2428)) [[1fd191877](https://github.com/wvlet/airframe/commit/1fd191877)]
+
+## 22.9.2
+
+From this version, AirSpec testing library supports Scala 3 + Scala.js! 
+
+- airspec: Support Scala3 + scala.js ([#2427](https://github.com/wvlet/airframe/issues/2427)) [[3a73e4352](https://github.com/wvlet/airframe/commit/3a73e4352)]
+- Update grpc-netty-shaded, grpc-protobuf, ... to 1.49.1 ([#2425](https://github.com/wvlet/airframe/issues/2425)) [[33ab4afab](https://github.com/wvlet/airframe/commit/33ab4afab)]
+- airframe-surface: Scala 3 support without reflection ([#2399](https://github.com/wvlet/airframe/issues/2399)) [[568de2fcf](https://github.com/wvlet/airframe/commit/568de2fcf)]
+- Update airframe-codec, airframe-control, ... to 22.9.1 ([#2424](https://github.com/wvlet/airframe/issues/2424)) [[387cefbff](https://github.com/wvlet/airframe/commit/387cefbff)]
+- Update scala-compiler, scala-library, ... to 2.12.17 ([#2423](https://github.com/wvlet/airframe/issues/2423)) [[92b6b93aa](https://github.com/wvlet/airframe/commit/92b6b93aa)]
+- Remove unnecessary snapshoht step [[93ca3ac40](https://github.com/wvlet/airframe/commit/93ca3ac40)]
+- Upgrade to Scala 2.12.17 ([#2422](https://github.com/wvlet/airframe/issues/2422)) [[83c0323cf](https://github.com/wvlet/airframe/commit/83c0323cf)]
+
+## 22.9.1
+
+Upgrade to Scala.js 1.11.0.
+
+- Update sbt-scalajs, scalajs-compiler, ... to 1.11.0 ([#2417](https://github.com/wvlet/airframe/issues/2417)) [[b4e8cb8c8](https://github.com/wvlet/airframe/commit/b4e8cb8c8)]
+- Update scalajs-test-interface to 1.11.0 ([#2419](https://github.com/wvlet/airframe/issues/2419)) [[f0cd8583b](https://github.com/wvlet/airframe/commit/f0cd8583b)]
+- airframe-sql: Fix QName lookup from catalog ([#2421](https://github.com/wvlet/airframe/issues/2421)) [[2b0f9a056](https://github.com/wvlet/airframe/commit/2b0f9a056)]
+- airframe-sql: Add LogicalPlan.traverse ([#2420](https://github.com/wvlet/airframe/issues/2420)) [[fccca7e15](https://github.com/wvlet/airframe/commit/fccca7e15)]
+- airframe-sql: Resolve CTE before resolving group indexes ([#2414](https://github.com/wvlet/airframe/issues/2414)) [[346ac97d0](https://github.com/wvlet/airframe/commit/346ac97d0)]
+- Update circe-parser to 0.14.3 ([#2415](https://github.com/wvlet/airframe/issues/2415)) [[f0915b751](https://github.com/wvlet/airframe/commit/f0915b751)]
+- Update trino-main to 396 ([#2416](https://github.com/wvlet/airframe/issues/2416)) [[8e0c1c204](https://github.com/wvlet/airframe/commit/8e0c1c204)]
+- Update scalacheck to 1.17.0 ([#2418](https://github.com/wvlet/airframe/issues/2418)) [[1b873989a](https://github.com/wvlet/airframe/commit/1b873989a)]
+- Update sbt-scoverage to 2.0.3 ([#2412](https://github.com/wvlet/airframe/issues/2412)) [[687a6f75a](https://github.com/wvlet/airframe/commit/687a6f75a)]
+- Update protobuf-java to 3.21.6 ([#2409](https://github.com/wvlet/airframe/issues/2409)) [[b9bc27c27](https://github.com/wvlet/airframe/commit/b9bc27c27)]
+
+## 22.9.0
+
+Added SQL type resolver to airframe-sql and improved Scala 3 compatibility of airframe-surface. 
+
+- airframe-sql: Resolve aggregation keys properly ([#2406](https://github.com/wvlet/airframe/issues/2406)) [[bfdac25bf](https://github.com/wvlet/airframe/commit/bfdac25bf)]
+- airframe-sql: Resolve function inputs ([#2401](https://github.com/wvlet/airframe/issues/2401)) [[7965e3f13](https://github.com/wvlet/airframe/commit/7965e3f13)]
+- airframe-sql: Resolve joins ([#2389](https://github.com/wvlet/airframe/issues/2389)) [[f874b8917](https://github.com/wvlet/airframe/commit/f874b8917)]
+- airframe-sql: Propagate column metadata ([#2376](https://github.com/wvlet/airframe/issues/2376)) [[d6d36b471](https://github.com/wvlet/airframe/commit/d6d36b471)]
+- airframe-ulid: [#2106](https://github.com/wvlet/airframe/issues/2106) Add ULID.ofMillis(unix time milliseconds) ([#2400](https://github.com/wvlet/airframe/issues/2400)) [[23c1b3a65](https://github.com/wvlet/airframe/commit/23c1b3a65)]
+- airframe-surface: [#2396](https://github.com/wvlet/airframe/issues/2396) Build EnumSurface without reflection ([#2398](https://github.com/wvlet/airframe/issues/2398)) [[4eab8bd91](https://github.com/wvlet/airframe/commit/4eab8bd91)]
+- airframe-surface: Scala3 higher-kind type support ([#2395](https://github.com/wvlet/airframe/issues/2395)) [[a1ce6845e](https://github.com/wvlet/airframe/commit/a1ce6845e)]
+- Update snakeyaml to 1.32 ([#2404](https://github.com/wvlet/airframe/issues/2404)) [[d1697b04e](https://github.com/wvlet/airframe/commit/d1697b04e)]
+- Update sqlite-jdbc to 3.39.3.0 ([#2403](https://github.com/wvlet/airframe/issues/2403)) [[665556f0f](https://github.com/wvlet/airframe/commit/665556f0f)]
+- Update trino-main to 395 ([#2402](https://github.com/wvlet/airframe/issues/2402)) [[8c0ce6f6b](https://github.com/wvlet/airframe/commit/8c0ce6f6b)]
+- airspec: Upgrade to Scala 3.2.0 ([#2394](https://github.com/wvlet/airframe/issues/2394)) [[ab39f2427](https://github.com/wvlet/airframe/commit/ab39f2427)]
+- Update antlr4, antlr4-runtime to 4.11.1 ([#2392](https://github.com/wvlet/airframe/issues/2392)) [[9f5654ec6](https://github.com/wvlet/airframe/commit/9f5654ec6)]
+- Update sbt-scalajs-bundler to 0.21.0 ([#2388](https://github.com/wvlet/airframe/issues/2388)) [[a7b95a91e](https://github.com/wvlet/airframe/commit/a7b95a91e)]
+- Update scalajs-dom to 2.3.0 ([#2387](https://github.com/wvlet/airframe/issues/2387)) [[6b40ca536](https://github.com/wvlet/airframe/commit/6b40ca536)]
+- Upgrade to Scala 3.2.0 ([#2393](https://github.com/wvlet/airframe/issues/2393)) [[e9ce3466b](https://github.com/wvlet/airframe/commit/e9ce3466b)]
+- Update sbt-scoverage to 2.0.2 ([#2362](https://github.com/wvlet/airframe/issues/2362)) [[f9f871120](https://github.com/wvlet/airframe/commit/f9f871120)]
+- Update trino-main to 394 ([#2386](https://github.com/wvlet/airframe/issues/2386)) [[43b63cb0d](https://github.com/wvlet/airframe/commit/43b63cb0d)]
+- airframe-sql: Resolve CTE query types ([#2385](https://github.com/wvlet/airframe/issues/2385)) [[b5c14034b](https://github.com/wvlet/airframe/commit/b5c14034b)]
+- Update snakeyaml to 1.31 ([#2383](https://github.com/wvlet/airframe/issues/2383)) [[87dfef611](https://github.com/wvlet/airframe/commit/87dfef611)]
+- Update sqlite-jdbc to 3.39.2.1 ([#2382](https://github.com/wvlet/airframe/issues/2382)) [[a8f417273](https://github.com/wvlet/airframe/commit/a8f417273)]
+- Update postgresql to 42.5.0 ([#2381](https://github.com/wvlet/airframe/issues/2381)) [[d70ca2230](https://github.com/wvlet/airframe/commit/d70ca2230)]
+- Update grpc-netty-shaded, grpc-protobuf, ... to 1.49.0 ([#2380](https://github.com/wvlet/airframe/issues/2380)) [[6f250895d](https://github.com/wvlet/airframe/commit/6f250895d)]
+- Update airframe-codec, airframe-control, ... to 22.8.0 ([#2377](https://github.com/wvlet/airframe/issues/2377)) [[519af3963](https://github.com/wvlet/airframe/commit/519af3963)]
+
+## 22.8.0
+
+- airframe-rpc: Added [RPCContext](https://wvlet.org/airframe/docs/airframe-rpc#rpccontext) to access the original HTTP request and thread-local storage.
+- airframe-rpc: Added RPCStatus.(code).newException to report errors to RPC clients. See also https://wvlet.org/airframe/docs/airframe-rpc for more details.
+
+Other updates: 
+
+- airframe-rpc: Add RPCStatus and RPC client documentation ([#2375](https://github.com/wvlet/airframe/issues/2375)) [[196433a38](https://github.com/wvlet/airframe/commit/196433a38)]
+- Update trino-main to 393 ([#2372](https://github.com/wvlet/airframe/issues/2372)) [[090f88e3d](https://github.com/wvlet/airframe/commit/090f88e3d)]
+- airframe-grpc: Fix thread local storage ([#2373](https://github.com/wvlet/airframe/issues/2373)) [[216a3099c](https://github.com/wvlet/airframe/commit/216a3099c)]
+- Update README.md to fix ([#2374](https://github.com/wvlet/airframe/issues/2374)) [[78fb5686c](https://github.com/wvlet/airframe/commit/78fb5686c)]
+- Update postgresql to 42.4.2 ([#2371](https://github.com/wvlet/airframe/issues/2371)) [[0b6136e5c](https://github.com/wvlet/airframe/commit/0b6136e5c)]
+- airframe-rpc: [#2368](https://github.com/wvlet/airframe/issues/2368) Add RPCContext to access thread-local storage and http request ([#2369](https://github.com/wvlet/airframe/issues/2369)) [[4f7ac2ceb](https://github.com/wvlet/airframe/commit/4f7ac2ceb)]
+- Update swagger-parser to 2.1.2 ([#2367](https://github.com/wvlet/airframe/issues/2367)) [[7127ac2f8](https://github.com/wvlet/airframe/commit/7127ac2f8)]
+- airframe-sql: Support generic data types ([#2365](https://github.com/wvlet/airframe/issues/2365)) [[f62047af8](https://github.com/wvlet/airframe/commit/f62047af8)]
+- Update scalafmt-core to 3.5.9 ([#2366](https://github.com/wvlet/airframe/issues/2366)) [[bf28f3b10](https://github.com/wvlet/airframe/commit/bf28f3b10)]
+- Update protobuf-java to 3.21.5 ([#2364](https://github.com/wvlet/airframe/issues/2364)) [[a6054800b](https://github.com/wvlet/airframe/commit/a6054800b)]
+- airframe-sql: Add SQL type name parser ([#2363](https://github.com/wvlet/airframe/issues/2363)) [[40a63bb7a](https://github.com/wvlet/airframe/commit/40a63bb7a)]
+- Update hadoop-aws, hadoop-client to 3.3.4 ([#2358](https://github.com/wvlet/airframe/issues/2358)) [[78e6a0f41](https://github.com/wvlet/airframe/commit/78e6a0f41)]
+- Update sqlite-jdbc to 3.39.2.0 ([#2357](https://github.com/wvlet/airframe/issues/2357)) [[0422e6106](https://github.com/wvlet/airframe/commit/0422e6106)]
+- Update trino-main to 392 ([#2355](https://github.com/wvlet/airframe/issues/2355)) [[93ef71f8f](https://github.com/wvlet/airframe/commit/93ef71f8f)]
+- Update postgresql to 42.4.1 ([#2356](https://github.com/wvlet/airframe/issues/2356)) [[404353335](https://github.com/wvlet/airframe/commit/404353335)]
+- Update grpc-netty-shaded, grpc-protobuf, ... to 1.48.1 ([#2354](https://github.com/wvlet/airframe/issues/2354)) [[08791e92c](https://github.com/wvlet/airframe/commit/08791e92c)]
+- Update finagle-core, finagle-http, ... to 22.7.0 ([#2349](https://github.com/wvlet/airframe/issues/2349)) [[7c647a08d](https://github.com/wvlet/airframe/commit/7c647a08d)]
+- Update scala-collection-compat to 2.8.1 ([#2350](https://github.com/wvlet/airframe/issues/2350)) [[20ce92670](https://github.com/wvlet/airframe/commit/20ce92670)]
+- Update sbt-mdoc to 2.3.3 ([#2351](https://github.com/wvlet/airframe/issues/2351)) [[385f9a4a4](https://github.com/wvlet/airframe/commit/385f9a4a4)]
+- Update protobuf-java to 3.21.4 ([#2348](https://github.com/wvlet/airframe/issues/2348)) [[1dfb248cd](https://github.com/wvlet/airframe/commit/1dfb248cd)]
+- airframe-grpc: Fix NPE in Scala 3 ([#2346](https://github.com/wvlet/airframe/issues/2346)) [[a3f5e1c73](https://github.com/wvlet/airframe/commit/a3f5e1c73)]
+- airframe-surface: Use GenericSurface for Scala 3 + Scala.js ([#2345](https://github.com/wvlet/airframe/issues/2345)) [[2fb5f8d22](https://github.com/wvlet/airframe/commit/2fb5f8d22)]
+- airframe-surface: Read default parameters in Scala 3  ([#2344](https://github.com/wvlet/airframe/issues/2344)) [[75193e4fd](https://github.com/wvlet/airframe/commit/75193e4fd)]
+- Add Scala 3 format check ([#2343](https://github.com/wvlet/airframe/issues/2343)) [[5419e65db](https://github.com/wvlet/airframe/commit/5419e65db)]
+- airframe-surface: Read annotation in Scala 3 macros ([#2341](https://github.com/wvlet/airframe/issues/2341)) [[2e045057f](https://github.com/wvlet/airframe/commit/2e045057f)]
+- Update/grpc netty shaded 1.48.0 ([#2340](https://github.com/wvlet/airframe/issues/2340)) [[f697078e2](https://github.com/wvlet/airframe/commit/f697078e2)]
+- Update protobuf-java to 3.21.3 ([#2335](https://github.com/wvlet/airframe/issues/2335)) [[0cd29c7d6](https://github.com/wvlet/airframe/commit/0cd29c7d6)]
+- Update trino-main to 391 ([#2339](https://github.com/wvlet/airframe/issues/2339)) [[3ca0cfef8](https://github.com/wvlet/airframe/commit/3ca0cfef8)]
+- Update airframe-http, ... to 22.7.3 ([#2333](https://github.com/wvlet/airframe/issues/2333)) [[da9432d3b](https://github.com/wvlet/airframe/commit/da9432d3b)]
+- Upgrade to airframe/airspec 22.7.3 ([#2332](https://github.com/wvlet/airframe/issues/2332)) [[cd6622d4d](https://github.com/wvlet/airframe/commit/cd6622d4d)]
+- Update airframe-codec, airframe-control, ... to 22.7.3 ([#2331](https://github.com/wvlet/airframe/issues/2331)) [[188cb691b](https://github.com/wvlet/airframe/commit/188cb691b)]
+
+## 22.7.3
+
+This version removes the absolute source code paths embedded to the compiled binaries when using airframe-log, airframe-di, airspec. This will reduce the generated class file size and protect the privacy of your local folder information.
+
+- Removing full source paths from the generated code  ([#2330](https://github.com/wvlet/airframe/issues/2330)) [[b10c9490e](https://github.com/wvlet/airframe/commit/b10c9490e)]
+- Update trino-main to 390 ([#2325](https://github.com/wvlet/airframe/issues/2325)) [[681c82780](https://github.com/wvlet/airframe/commit/681c82780)]
+- Use 2.12.x wildcard version in CI ([#2329](https://github.com/wvlet/airframe/issues/2329)) [[1090ccf00](https://github.com/wvlet/airframe/commit/1090ccf00)]
+- Update airframe-codec, airframe-control, ... to 22.7.2 ([#2323](https://github.com/wvlet/airframe/issues/2323)) [[7ba1b05ff](https://github.com/wvlet/airframe/commit/7ba1b05ff)]
+- Update airframe-codec, airframe-control, ... to 22.7.2 ([#2321](https://github.com/wvlet/airframe/issues/2321)) [[8f90e5079](https://github.com/wvlet/airframe/commit/8f90e5079)]
+
+## 22.7.2
+
+This version recompiles airframe for Java8 target.
+
+- Retarget to JDK8 ([#2320](https://github.com/wvlet/airframe/issues/2320)) [[411f510e0](https://github.com/wvlet/airframe/commit/411f510e0)]
+- Update sbt, sbt-dependency-tree, ... to 1.7.1 ([#2317](https://github.com/wvlet/airframe/issues/2317)) [[6dbd501e8](https://github.com/wvlet/airframe/commit/6dbd501e8)]
+- Update sbt, sbt-dependency-tree, ... to 1.7.0 ([#2314](https://github.com/wvlet/airframe/issues/2314)) [[713302a98](https://github.com/wvlet/airframe/commit/713302a98)]
+- airframe-http: Add a filter for http client logs ([#2315](https://github.com/wvlet/airframe/issues/2315)) [[199f0e950](https://github.com/wvlet/airframe/commit/199f0e950)]
+- Update airspec to 22.7.1 ([#2310](https://github.com/wvlet/airframe/issues/2310)) [[c3969131f](https://github.com/wvlet/airframe/commit/c3969131f)]
+- Ignore unstable tests ([#2313](https://github.com/wvlet/airframe/issues/2313)) [[9e7fea68f](https://github.com/wvlet/airframe/commit/9e7fea68f)]
+- Update scala-collection-compat to 2.8.0 ([#2311](https://github.com/wvlet/airframe/issues/2311)) [[81edbb08f](https://github.com/wvlet/airframe/commit/81edbb08f)]
+- Update airframe-codec, airframe-control, ... to 22.7.1 ([#2309](https://github.com/wvlet/airframe/issues/2309)) [[4517db953](https://github.com/wvlet/airframe/commit/4517db953)]
+- Update trino-main to 389 ([#2306](https://github.com/wvlet/airframe/issues/2306)) [[04ac827a1](https://github.com/wvlet/airframe/commit/04ac827a1)]
+- Use Scala 2.12.16 for testing ([#2308](https://github.com/wvlet/airframe/issues/2308)) [[0a2cdc133](https://github.com/wvlet/airframe/commit/0a2cdc133)]
+- Update airframe-codec, airframe-control, ... to 22.7.1 ([#2305](https://github.com/wvlet/airframe/issues/2305)) [[75e3aa13a](https://github.com/wvlet/airframe/commit/75e3aa13a)]
+
+## 22.7.1
+
+This version includes minor updates and upgrades to Scala 3.1.3. 
+
+- airframe-metrics: Use ZoneId for TimeWindow.withTimeZone() instead of ZoneOffset ([#2298](https://github.com/wvlet/airframe/issues/2298)) [[2f0fb0d79](https://github.com/wvlet/airframe/commit/2f0fb0d79)]
+- airframe-launcher: Fixes [#2291](https://github.com/wvlet/airframe/issues/2291) support nested objects in command args ([#2297](https://github.com/wvlet/airframe/issues/2297)) [[e6003ef4d](https://github.com/wvlet/airframe/commit/e6003ef4d)]
+- Upgrade to Scala 3.1.3 ([#2284](https://github.com/wvlet/airframe/issues/2284)) [[e6c5abddc](https://github.com/wvlet/airframe/commit/e6c5abddc)]
+
+- Use Scala 2.12.16 for sbt-airframe build ([#2304](https://github.com/wvlet/airframe/issues/2304)) [[efc937137](https://github.com/wvlet/airframe/commit/efc937137)]
+- Update airframe-codec, airframe-control, ... to 22.7.0 ([#2303](https://github.com/wvlet/airframe/issues/2303)) [[b2afe579c](https://github.com/wvlet/airframe/commit/b2afe579c)]
+- Update airframe-codec, airframe-control, ... to 22.6.4 ([#2301](https://github.com/wvlet/airframe/issues/2301)) [[13f6ad130](https://github.com/wvlet/airframe/commit/13f6ad130)]
+- Update airspec to 22.7.0 ([#2302](https://github.com/wvlet/airframe/issues/2302)) [[6dc076354](https://github.com/wvlet/airframe/commit/6dc076354)]
+- Update airspec, sbt-airframe to 22.7.0 ([#2295](https://github.com/wvlet/airframe/issues/2295)) [[e3512d5ff](https://github.com/wvlet/airframe/commit/e3512d5ff)]
+
+## 22.7.0
+
+This version upgrades Scala.js to 1.10.1, msgpack-core 0.9.3 (JDK17 support).
+AirSpec 22.7.0 fixes JUnit test report (test-repot.xml) output. 
+
+- Update fluency-core, fluency-fluentd, ... to 2.6.5 ([#2293](https://github.com/wvlet/airframe/issues/2293)) [[37d990ba5](https://github.com/wvlet/airframe/commit/37d990ba5)]
+- airspec: Fix [#2290](https://github.com/wvlet/airframe/issues/2290). Report test spec names to test-report.xml properly ([#2294](https://github.com/wvlet/airframe/issues/2294)) [[6457f9389](https://github.com/wvlet/airframe/commit/6457f9389)]
+- Update trino-main to 388 ([#2288](https://github.com/wvlet/airframe/issues/2288)) [[007703355](https://github.com/wvlet/airframe/commit/007703355)]
+- Update msgpack-core to 0.9.3 ([#2285](https://github.com/wvlet/airframe/issues/2285)) [[ccb849442](https://github.com/wvlet/airframe/commit/ccb849442)]
+- Update scala-js-macrotask-executor to 1.1.0 ([#2283](https://github.com/wvlet/airframe/issues/2283)) [[e9788aec7](https://github.com/wvlet/airframe/commit/e9788aec7)]
+- Update scalajs-test-interface to 1.10.1 ([#2281](https://github.com/wvlet/airframe/issues/2281)) [[996b9a8ed](https://github.com/wvlet/airframe/commit/996b9a8ed)]
+- Update protobuf-java to 3.21.2 ([#2275](https://github.com/wvlet/airframe/issues/2275)) [[18bcf2007](https://github.com/wvlet/airframe/commit/18bcf2007)]
+- openapi: Stabilize unit tests ([#2280](https://github.com/wvlet/airframe/issues/2280)) [[298b370ab](https://github.com/wvlet/airframe/commit/298b370ab)]
+- Update sbt-scalajs, scalajs-compiler, ... to 1.10.1 ([#2278](https://github.com/wvlet/airframe/issues/2278)) [[009cd5526](https://github.com/wvlet/airframe/commit/009cd5526)]
+- Update sbt-scoverage to 2.0.0 ([#2277](https://github.com/wvlet/airframe/issues/2277)) [[f10a1c6be](https://github.com/wvlet/airframe/commit/f10a1c6be)]
+- Update auth to 2.17.217 ([#2271](https://github.com/wvlet/airframe/issues/2271)) [[550cc1406](https://github.com/wvlet/airframe/commit/550cc1406)]
+- Update trino-main to 387 ([#2270](https://github.com/wvlet/airframe/issues/2270)) [[9758ec092](https://github.com/wvlet/airframe/commit/9758ec092)]
+
 ## 22.6.4
 
 This version has a minor fix for supporting upcoming Scala 2.13.9

@@ -21,7 +21,6 @@ import wvlet.airframe.json.Json
 import wvlet.airframe.metrics.{Count, DataSize, ElapsedTime}
 import wvlet.airframe.msgpack.spi.{MsgPack, Value}
 import wvlet.airframe.surface._
-import wvlet.airframe.surface.reflect.{ReflectMethodSurface, ReflectTypeUtil}
 import wvlet.airframe.ulid.ULID
 import wvlet.log.LogSupport
 import wvlet.airframe.surface.reflect._
@@ -364,12 +363,14 @@ class OpenAPIGenerator(config: OpenAPIGeneratorConfig) extends LogSupport {
   }
 
   private def getOrUpdateSchema(surface: Surface, factory: => SchemaOrRef): SchemaOrRef = {
-    schemaCache.get(surface) match {
-      case Some(x) => x
-      case None =>
-        val v = factory
-        schemaCache += surface -> v
-        v
+    synchronized {
+      schemaCache.get(surface) match {
+        case Some(x) => x
+        case None =>
+          val v = factory
+          schemaCache += surface -> v
+          v
+      }
     }
   }
 

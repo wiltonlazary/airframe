@@ -19,6 +19,6 @@ object JSON_01_Parse extends App {
   import wvlet.airframe.json.JSON
 
   val j    = JSON.parse("""{"id":1, "name":"leo"}""")
-  val id   = (j / "id").value
-  val name = (j / "name").value
+  val id   = (j / "id").getValue
+  val name = (j / "name").getValue
 }

@@ -16,7 +16,7 @@ package wvlet.airspec
 import java.lang.reflect.InvocationTargetException
 import sbt.testing.Fingerprint
 import wvlet.log.LogFormatter.SourceCodeLogFormatter
-import wvlet.log.Logger
+import wvlet.log.{LogSupport, Logger}
 
 import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
@@ -29,7 +29,7 @@ import scala.concurrent.ExecutionContext
 
 /**
   */
-private[airspec] object Compat extends CompatApi {
+private[airspec] object Compat extends CompatApi with LogSupport {
   override def isScalaJs = false
 
   override private[airspec] val executionContext: ExecutionContext =
@@ -42,13 +42,11 @@ private[airspec] object Compat extends CompatApi {
 
   private[airspec] def getFingerprint(fullyQualifiedName: String, classLoader: ClassLoader): Option[Fingerprint] = {
     Try(findCompanionObjectOf(fullyQualifiedName, classLoader)).toOption
-      .flatMap { x =>
-        x match {
-          case spec: AirSpecSpi =>
-            Some(AirSpecObjectFingerPrint)
-          case _ =>
-            None
-        }
+      .flatMap {
+        case Some(spec: AirSpecSpi) =>
+          Some(AirSpecObjectFingerPrint)
+        case other =>
+          None
       }
       .orElse {
         Try(classLoader.loadClass(fullyQualifiedName)).toOption
@@ -65,10 +63,17 @@ private[airspec] object Compat extends CompatApi {
   private[airspec] def newInstanceOf(fullyQualifiedName: String, classLoader: ClassLoader): Option[Any] = {
     Try(classLoader.loadClass(fullyQualifiedName).getDeclaredConstructor().newInstance()) match {
       case Success(x) => Some(x)
-      case Failure(e: InvocationTargetException)
-          if classOf[spi.AirSpecException].isAssignableFrom(e.getCause.getClass) =>
-        throw e
-      case _ => None
+      case Failure(e: InvocationTargetException) if e.getCause != null =>
+        if (classOf[spi.AirSpecException].isAssignableFrom(e.getCause.getClass)) {
+          // For assertion failrues, throw it as is
+          throw e
+        } else {
+          // For other failures when instantiating the object, throw the cause
+          throw e.getCause
+        }
+      case _ =>
+        // Ignore other types of failures, which should not happen in general
+        None
     }
   }
 

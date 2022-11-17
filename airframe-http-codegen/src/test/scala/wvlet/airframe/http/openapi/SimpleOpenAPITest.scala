@@ -48,6 +48,7 @@ object SimpleOpenAPITest extends AirSpec {
     val yaml = openApiGenerator(r).toYAML
     debug(yaml)
 
+    pending(s"This test has been unstable. Need more information")
     yaml.contains(
       s"""Stat:
          |      type: object
@@ -103,6 +104,12 @@ object SimpleOpenAPITest extends AirSpec {
         @description("custom parameter 1")
         p1: String
     ): Method1Response
+
+    @description("multi-line\ndescription")
+    def method2(): Unit
+
+    @description("'single-quoted' description")
+    def method3(): Unit
   }
 
   @description("method1 response")
@@ -117,6 +124,18 @@ object SimpleOpenAPITest extends AirSpec {
     yaml.contains("description: 'custom parameter 1'") shouldBe true
     yaml.contains("description: 'method1 response'") shouldBe true
     yaml.contains("description: 'response code'") shouldBe true
-  }
 
+    test("Use literal format multiline descriptions") {
+      yaml.contains("""description: |
+          |  multi-line
+          |  description""".stripMargin)
+    }
+
+    test("Use literal format for strings with single quote") {
+      yaml.contains(
+        """description: |
+          |  'single-quoted' description""".stripMargin
+      )
+    }
+  }
 }

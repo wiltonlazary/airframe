@@ -17,7 +17,7 @@ import io.grpc.{Attributes, Metadata, MethodDescriptor}
 import wvlet.airframe.http.BuildInfo
 import wvlet.airframe.http.HttpAccessLogWriter
 import wvlet.airframe.http.grpc.GrpcContext
-import wvlet.airframe.http.router.RPCCallContext
+import wvlet.airframe.http.internal.{HttpLogs, RPCCallContext}
 import wvlet.log.LogSupport
 
 import scala.collection.immutable.ListMap
@@ -38,16 +38,16 @@ class DefaultGrpcRequestLogger(serverName: String, logWriter: HttpAccessLogWrite
 
   }
   def logError(e: Throwable, grpcContext: Option[GrpcContext], rpcCallContext: RPCCallContext): Unit = {
-    val m = logDefault(grpcContext, rpcCallContext) ++ HttpAccessLogWriter.errorLog(e)
+    val m = logDefault(grpcContext, rpcCallContext) ++ HttpLogs.errorLogs(e)
     logWriter.write(m)
   }
 
   private def logDefault(grpcContext: Option[GrpcContext], rpcCallContext: RPCCallContext): Map[String, Any] = {
     val m = {
-      HttpAccessLogWriter.logUnixTime ++
+      HttpLogs.unixTimeLogs() ++
         ListMap("server_name" -> serverName, "x_airframe_server_version" -> BuildInfo.version) ++
         GrpcRequestLogger.logGrpcContext(grpcContext) ++
-        HttpAccessLogWriter.rpcLog(rpcCallContext)
+        HttpLogs.rpcLogs(rpcCallContext)
     }
     m
   }
@@ -91,13 +91,12 @@ object GrpcRequestLogger extends LogSupport {
 
   private def logAttributes(a: Attributes): Map[String, Any] = {
     val m = ListMap.newBuilder[String, Any]
-    // A hack to extract client local/remote addresses from the string representation of an gRPC Attribute:
-    for (elems <- a.toString.stripPrefix("{").stripSuffix("}").split(",\\s+")) {
-      elems.split("=") match {
-        case Array(k, v) if k.endsWith("-addr") =>
-          m += HttpAccessLogWriter.sanitizeHeader(k) -> v.stripPrefix("/")
-        case _ =>
-      }
+    // Transport parameter keys become available since grpc-java 1.48.0
+    Option(a.get(io.grpc.Grpc.TRANSPORT_ATTR_LOCAL_ADDR)).foreach { addr =>
+      m += "local_addr" -> addr.toString.stripPrefix("/")
+    }
+    Option(a.get(io.grpc.Grpc.TRANSPORT_ATTR_REMOTE_ADDR)).foreach { addr =>
+      m += "remote_addr" -> addr.toString.stripPrefix("/")
     }
     m.result()
   }

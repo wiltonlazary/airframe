@@ -14,8 +14,9 @@
 package wvlet.airframe.sql.parser
 
 import org.antlr.v4.runtime.{DefaultErrorStrategy, RecognitionException, _}
+import wvlet.airframe.sql.SQLErrorCode
 import wvlet.log.LogSupport
-import wvlet.airframe.sql.model.LogicalPlan
+import wvlet.airframe.sql.model.{LogicalPlan, NodeLocation}
 
 /**
   * SQL -> Token -> ANTLR parzse tree -> LogicalPlan
@@ -31,11 +32,18 @@ object SQLParser extends LogSupport {
           msg: String,
           e: RecognitionException
       ): Unit = {
-        throw new SQLParseError(msg, line, charPositionInLine, e)
+        val location = NodeLocation(line, charPositionInLine)
+        throw SQLErrorCode.SyntaxError
+          .withMetadata(Map("line" -> line, "pos" -> charPositionInLine))
+          .newException(
+            s"Parse error at line ${line}:${charPositionInLine}. ${msg}",
+            e,
+            Some(location)
+          )
       }
     }
 
-  def parse(sql: String): LogicalPlan = {
+  def parse(sql: String, withNodeLocation: Boolean = true): LogicalPlan = {
     trace(s"parse: ${sql}")
     val parser = new SqlBaseParser(tokenStream(sql))
 
@@ -53,7 +61,7 @@ object SQLParser extends LogSupport {
 
     val ctx = parser.singleStatement()
     trace(ctx.toStringTree(parser))
-    val interpreter = new SQLInterpreter
+    val interpreter = new SQLInterpreter(withNodeLocation)
     interpreter.interpret(ctx)
   }
 
@@ -67,6 +75,3 @@ object SQLParser extends LogSupport {
     SqlBaseParser.VOCABULARY.getDisplayName(t.getType)
   }
 }
-
-class SQLParseError(message: String, val line: Int, val pos: Int, cause: RecognitionException)
-    extends Exception(s"Parse error at line:${line}, pos:${pos}. ${message}", cause) {}

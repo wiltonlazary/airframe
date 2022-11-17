@@ -145,7 +145,7 @@ case class Router(
             .map { m =>
               (m, m.findAnnotationOf[Endpoint])
             }
-            .collect { case (m: ReflectMethodSurface, Some(endPoint)) =>
+            .collect { case (m: MethodSurface, Some(endPoint)) =>
               val endpointInterfaceCls =
                 controllerSurface
                   .findAnnotationOwnerOf[Endpoint]
@@ -161,13 +161,14 @@ case class Router(
             }
         case (None, Some(rpc)) =>
           val rpcInterfaceCls = Router.findRPCInterfaceCls(controllerSurface)
-          val serviceFullName = rpcInterfaceCls.getName
-            .replaceAll("\\$anon\\$", "")
-            .replaceAll("\\$", ".")
+
+          def sanitize(s: String): String = {
+            s.replaceAll("\\$anon\\$", "").replaceAll("\\$", ".")
+          }
           val prefixPath = if (rpc.path().isEmpty) {
-            s"/${serviceFullName}"
+            s"/${sanitize(rpcInterfaceCls.getName)}"
           } else {
-            s"${rpc.path()}/${serviceFullName}"
+            s"${rpc.path()}/${sanitize(rpcInterfaceCls.getSimpleName)}"
           }
           val routes = controllerMethodSurfaces
             .filter(_.isPublic)
@@ -175,11 +176,18 @@ case class Router(
               (m, m.findAnnotationOf[RPC])
             }
             .collect {
-              case (m: ReflectMethodSurface, Some(rpc)) =>
-                val path =
+              case (m: MethodSurface, Some(rpc)) =>
+                val methodPath =
                   if (rpc.path().nonEmpty) rpc.path() else s"/${m.name}"
-                ControllerRoute(rpcInterfaceCls, controllerSurface, HttpMethod.POST, prefixPath + path, m, isRPC = true)
-              case (m: ReflectMethodSurface, None) =>
+                ControllerRoute(
+                  rpcInterfaceCls,
+                  controllerSurface,
+                  HttpMethod.POST,
+                  prefixPath + methodPath,
+                  m,
+                  isRPC = true
+                )
+              case (m: MethodSurface, None) =>
                 ControllerRoute(
                   rpcInterfaceCls,
                   controllerSurface,

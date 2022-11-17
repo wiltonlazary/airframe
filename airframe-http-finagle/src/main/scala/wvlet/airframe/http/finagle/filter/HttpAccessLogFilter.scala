@@ -18,7 +18,7 @@ import com.twitter.util.Future
 import wvlet.airframe.control.MultipleExceptions
 import wvlet.airframe.http.finagle.filter.HttpAccessLogFilter._
 import wvlet.airframe.http.finagle.{FinagleBackend, FinagleServer}
-import wvlet.airframe.http.router.RPCCallContext
+import wvlet.airframe.http.internal.{HttpLogs, RPCCallContext}
 import wvlet.airframe.http.{HttpAccessLogWriter, HttpBackend, HttpHeader, HttpStatus}
 
 import java.util.concurrent.TimeUnit
@@ -202,10 +202,10 @@ object HttpAccessLogFilter {
   def errorLogger(request: Request, e: Throwable): Map[String, Any] = HttpAccessLogWriter.errorLog(e)
   def rpcLogger(request: Request): Map[String, Any] = {
     val m = ListMap.newBuilder[String, Any]
-    FinagleBackend.getThreadLocal(HttpBackend.TLS_KEY_RPC).foreach { x: Any =>
+    FinagleBackend.getThreadLocal(HttpBackend.TLS_KEY_RPC).foreach { (x: Any) =>
       x match {
         case c @ RPCCallContext(rpcInterface, methodSurface, args) =>
-          m ++= HttpAccessLogWriter.rpcLog(c)
+          m ++= HttpLogs.rpcLogs(c)
         case _ =>
       }
     }

@@ -44,7 +44,7 @@ trait ChannelConfig {
 case class HttpClientConfig(
     backend: HttpClientBackend = compat.defaultHttpClientBackend,
     requestFilter: Request => Request = identity,
-    rpcEncoding: RPCEncoding = RPCEncoding.MsgPack,
+    rpcEncoding: RPCEncoding = RPCEncoding.JSON,
     retryContext: RetryContext = compat.defaultHttpClientBackend.defaultRequestRetryer,
     codecFactory: MessageCodecFactory = MessageCodecFactory.defaultFactoryForJSON,
     // The default circuit breaker, which will be open after 5 consecutive failures
@@ -55,6 +55,7 @@ case class HttpClientConfig(
     readTimeout: Duration = Duration(90, TimeUnit.SECONDS),
     // Provide a thread executor for managing Scala Future responses
     executionContextProvider: HttpClientConfig => ExecutionContext = { _ => compat.defaultExecutionContext },
+    // loggingFilter: ClientFilter = ClientLoggingFilter,
     clientFilter: ClientFilter = ClientFilter.identity,
     /**
       * For converting Future[A] to Rx[A]. Use this method when you need to add a common error handler for Rx (e.g.,

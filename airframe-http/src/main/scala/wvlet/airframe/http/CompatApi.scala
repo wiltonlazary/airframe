@@ -26,4 +26,8 @@ trait CompatApi {
   def hostServerAddress: ServerAddress
   def defaultHttpClientBackend: HttpClientBackend
   def defaultExecutionContext: ExecutionContext
+
+  def currentRPCContext: RPCContext
+  def attachRPCContext(context: RPCContext): RPCContext
+  def detachRPCContext(previous: RPCContext): Unit
 }

@@ -89,4 +89,29 @@ class RPCStatusTest extends AirSpec {
     }
   }
 
+  test("Generate Markdown Table") {
+    val list = RPCStatus.all.map { x =>
+      s"| ${x.name} | ${x.statusType} | ${x.grpcStatus} | ${x.httpStatus.code}: ${x.httpStatus.reason} |"
+    }
+    val header =
+      s"""| RPCStatus | Type | gRPC Status | Http Status |
+       >|------------|------|-------------|-------------|""".stripMargin('>')
+
+    debug(s"${header}\n${list.mkString("\n")}")
+  }
+
+  test("fromHttpStatus") {
+//    // The code for generating mappings
+//    val statusMappings = HttpStatus.knownStatuses
+//      .sortBy(_.code)
+//      .map { s =>
+//        s"${s.getClass.getSimpleName.stripSuffix("$")} -> ${RPCStatus.fromGrpcStatusCode(GrpcStatus.ofHttpStatus(s).code)}"
+//      }.mkString(",\n")
+//
+    for (code <- 0 to 600) {
+      val h = HttpStatus.ofCode(code)
+      val r = RPCStatus.fromHttpStatus(HttpStatus.ofCode(code))
+      h.isSuccessful shouldBe r.isSuccess
+    }
+  }
 }

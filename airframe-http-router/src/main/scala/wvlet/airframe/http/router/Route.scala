@@ -13,11 +13,11 @@
  */
 package wvlet.airframe.http.router
 
-import wvlet.airframe.Session
+import wvlet.airframe.{Session, http}
 import wvlet.airframe.codec.{MISSING_PARAMETER, MessageCodecException, MessageCodecFactory}
 import wvlet.airframe.http._
+import wvlet.airframe.http.internal.RPCCallContext
 import wvlet.airframe.rx.Rx
-import wvlet.airframe.surface.reflect.ReflectMethodSurface
 import wvlet.airframe.surface.{MethodSurface, Surface}
 import wvlet.log.LogSupport
 
@@ -69,10 +69,6 @@ trait Route {
   ): Option[Any]
 }
 
-case class RPCCallContext(rpcInterfaceCls: Class[_], rpcMethodSurface: MethodSurface, rpcArgs: Seq[Any]) {
-  def withRPCArgs(rpcArgs: Seq[Any]): RPCCallContext = this.copy(rpcArgs = rpcArgs)
-}
-
 /**
   * Define mappings from an HTTP request to a controller method which has the Endpoint annotation
   */
@@ -81,7 +77,7 @@ case class ControllerRoute(
     controllerSurface: Surface,
     method: String,
     path: String,
-    methodSurface: ReflectMethodSurface,
+    methodSurface: MethodSurface,
     isRPC: Boolean
 ) extends Route
     with LogSupport {

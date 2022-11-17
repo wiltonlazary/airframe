@@ -1,30 +1,30 @@
 import xerial.sbt.pack.PackPlugin.publishPackArchiveTgz
 
-val SCALA_2_12          = "2.12.16"
-val SCALA_2_13          = "2.13.8"
-val SCALA_3_0           = "3.1.2"
-val targetScalaVersions = SCALA_2_13 :: SCALA_2_12 :: Nil
-val withDotty           = SCALA_3_0 :: targetScalaVersions
+val SCALA_2_12          = "2.12.17"
+val SCALA_2_13          = "2.13.10"
+val SCALA_3             = "3.2.1"
+val uptoScala2          = SCALA_2_13 :: SCALA_2_12 :: Nil
+val targetScalaVersions = SCALA_3 :: uptoScala2
 
 // Add this for using snapshot versions
 // ThisBuild / resolvers += Resolver.sonatypeRepo("snapshots")
 
-val AIRSPEC_VERSION                 = "22.6.4"
-val SCALACHECK_VERSION              = "1.16.0"
-val MSGPACK_VERSION                 = "0.9.2"
+val AIRSPEC_VERSION                 = "22.11.1"
+val SCALACHECK_VERSION              = "1.17.0"
+val MSGPACK_VERSION                 = "0.9.3"
 val SCALA_PARSER_COMBINATOR_VERSION = "2.1.1"
-val SQLITE_JDBC_VERSION             = "3.36.0.3"
-val SLF4J_VERSION                   = "1.7.36"
+val SQLITE_JDBC_VERSION             = "3.39.4.0"
+val SLF4J_VERSION                   = "2.0.3"
 val JS_JAVA_LOGGING_VERSION         = "1.0.0"
 val JS_JAVA_TIME_VERSION            = "1.0.0"
-val SCALAJS_DOM_VERSION             = "2.2.0"
-val FINAGLE_VERSION                 = "22.4.0"
-val FLUENCY_VERSION                 = "2.6.4"
-val GRPC_VERSION                    = "1.47.0"
-val JMH_VERSION                     = "1.35"
+val SCALAJS_DOM_VERSION             = "2.3.0"
+val FINAGLE_VERSION                 = "22.7.0"
+val FLUENCY_VERSION                 = "2.7.0"
+val GRPC_VERSION                    = "1.50.2"
+val JMH_VERSION                     = "1.36"
 val JAVAX_ANNOTATION_API_VERSION    = "1.3.2"
 val PARQUET_VERSION                 = "1.12.3"
-val SNAKE_YAML_VERSION              = "1.30"
+val SNAKE_YAML_VERSION              = "1.33"
 
 // A short cut for publishing snapshots to Sonatype
 addCommandAlias(
@@ -60,14 +60,15 @@ ThisBuild / usePipelining := false
 
 // A build configuration switch for working on Dotty migration. This needs to be removed eventually
 val DOTTY = sys.env.isDefinedAt("DOTTY")
-// For debugging
-// val DOTTY = true
 
-// Switch to DOTTY at the build level as we still have projects not ready for Scala 3
+// If DOTTY is set, use Scala 3 by default. This is for the convenience of working on Scala 3 projects
 ThisBuild / scalaVersion := {
-  if (DOTTY) SCALA_3_0
-  else SCALA_2_13
+  if (DOTTY)
+    SCALA_3
+  else
+    SCALA_2_13
 }
+
 ThisBuild / organization := "org.wvlet.airframe"
 
 // Use dynamic snapshot version strings for non tagged versions
@@ -89,11 +90,11 @@ val buildSettings = Seq[Setting[_]](
   ),
   // Exclude compile-time only projects. This is a workaround for bloop,
   // which cannot resolve Optional dependencies nor compile-internal dependencies.
-  pomPostProcess     := excludePomDependency(Seq("airspec_2.12", "airspec_2.13")),
+  pomPostProcess     := excludePomDependency(Seq("airspec_2.12", "airspec_2.13", "airspec_3")),
   crossScalaVersions := targetScalaVersions,
   crossPaths         := true,
   publishMavenStyle  := true,
-  javacOptions ++= Seq("-source", "11", "-target", "11"),
+  javacOptions ++= Seq("-source", "8", "-target", "8"),
   scalacOptions ++= Seq(
     "-feature",
     "-deprecation"
@@ -115,8 +116,13 @@ val buildSettings = Seq[Setting[_]](
     if (scalaVersion.value.startsWith("3."))
       Seq.empty
     else
-      Seq("org.scala-lang.modules" %%% "scala-collection-compat" % "2.7.0")
+      Seq("org.scala-lang.modules" %%% "scala-collection-compat" % "2.8.1")
   }
+)
+
+val scala2Only = Seq[Setting[_]](
+  scalaVersion       := SCALA_2_13,
+  crossScalaVersions := uptoScala2
 )
 
 // Do not run tests concurrently to avoid JMX registration failures
@@ -126,7 +132,6 @@ val runTestSequentially = Seq[Setting[_]](Test / parallelExecution := false)
 ThisBuild / publishTo := sonatypePublishToBundle.value
 
 val jsBuildSettings = Seq[Setting[_]](
-  crossScalaVersions := targetScalaVersions,
   // #2117 For using java.util.UUID.randomUUID() in Scala.js
   libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
     .cross(CrossVersion.for3Use2_13),
@@ -137,6 +142,9 @@ val noPublish = Seq(
   publishArtifact := false,
   publish         := {},
   publishLocal    := {},
+  publish / skip  := true,
+  // This must be Nil to use crossScalaVersions of individual modules in `+ projectJVM/xxxx` tasks
+  crossScalaVersions := Nil,
   // Explicitly skip the doc task because protobuf related Java files causes no type found error
   Compile / doc / sources                := Seq.empty,
   Compile / packageDoc / publishArtifact := false
@@ -165,25 +173,25 @@ lazy val root =
 
 // JVM projects for scala-community build. This should have no tricky setup and should support Scala 2.12.
 lazy val communityBuildProjects: Seq[ProjectReference] = Seq(
-  diMacrosJVM,
-  diJVM,
-  surfaceJVM,
-  logJVM,
+  diMacros.jvm,
+  di.jvm,
+  surface.jvm,
+  log.jvm,
   canvas,
   config,
-  controlJVM,
+  control.jvm,
   jmx,
   launcher,
-  metricsJVM,
-  codecJVM,
-  msgpackJVM,
-  rxJVM,
-  httpJVM,
+  metrics.jvm,
+  codec.jvm,
+  msgpack.jvm,
+  rx.jvm,
+  http.jvm,
   httpRouter,
   httpCodeGen,
   grpc,
-  jsonJVM,
-  rxHtmlJVM,
+  json.jvm,
+  rxHtml.jvm,
   parquet
 )
 
@@ -192,93 +200,85 @@ lazy val jvmProjects: Seq[ProjectReference] = communityBuildProjects ++ Seq[Proj
   jdbc,
   fluentd,
   finagle,
+  netty,
   okhttp,
   httpRecorder,
   benchmark,
   sql,
-  ulidJVM,
+  ulid.jvm,
   examples
 )
 
-// Scala.js build (only for Scala 2.12 + 2.13)
+// Scala.js build (Scala 2.12, 2.13, and 3.x)
 lazy val jsProjects: Seq[ProjectReference] = Seq(
-  logJS,
-  surfaceJS,
-  diMacrosJS,
-  diJS,
-  metricsJS,
-  controlJS,
-  ulidJS,
-  jsonJS,
-  msgpackJS,
-  codecJS,
-  rxJS,
-  httpJS,
-  rxHtmlJS,
+  log.js,
+  surface.js,
+  diMacros.js,
+  di.js,
+  metrics.js,
+  control.js,
+  ulid.js,
+  json.js,
+  msgpack.js,
+  codec.js,
+  http.js,
+  rx.js,
+  rxHtml.js,
   widgetJS
 )
 
 // For community-build
 lazy val communityBuild =
   project
-    .settings(
-      noPublish,
-      crossScalaVersions := targetScalaVersions
-    )
+    .settings(noPublish)
     .aggregate(communityBuildProjects: _*)
 
 // For Scala 2.12
 lazy val projectJVM =
   project
-    .settings(
-      noPublish,
-      crossScalaVersions := targetScalaVersions
-    )
+    .settings(noPublish)
     .aggregate(jvmProjects: _*)
 
 lazy val projectJS =
   project
-    .settings(
-      noPublish,
-      crossScalaVersions := targetScalaVersions
-    )
+    .settings(noPublish)
     .aggregate(jsProjects: _*)
 
-// For Dotty (Scala 3)
+// A scoped project only for Dotty (Scala 3).
+// This is a workaround as projectJVM/test shows compile errors for non Scala 3 ready projects
 lazy val projectDotty =
   project
-    .settings(
-      noPublish,
-      crossScalaVersions := Seq(SCALA_3_0)
-    )
+    .settings(noPublish)
     .aggregate(
-      diMacrosJVM,
-      diJVM,
-      logJVM,
-      surfaceJVM,
+      diMacros.jvm,
+      di.jvm,
+      log.jvm,
+      surface.jvm,
       canvas,
-      controlJVM,
+      control.jvm,
       config,
-      // codec uses Scala reflection
-      codecJVM,
+      codec.jvm,
       fluentd,
-      httpJVM,
+      http.jvm,
       httpRouter,
+      // Surface.of(Class[_]) needs to be supported
+      // httpCodeGen
+      // Finagle is used in the http recorder
+      // httpRecorder
       // // Finagle isn't supporting Scala 3
       // httpFinagle,
       // grpc,
       jdbc,
       jmx,
       launcher,
-      metricsJVM,
-      msgpackJVM,
-      jsonJVM,
+      metrics.jvm,
+      msgpack.jvm,
+      json.jvm,
       parquet,
-      rxJVM,
-      // rx-html uses Scala Macros
-      rxHtmlJVM,
+      rx.jvm,
+      rxHtml.jvm,
       sql,
-      ulidJVM
+      ulid.jvm
     )
 
 lazy val docs =
@@ -335,7 +335,6 @@ lazy val di =
     .crossType(CrossType.Pure)
     .in(file("airframe-di"))
     .settings(buildSettings)
-    .settings(dottyCrossBuildSettings)
     .settings(
       name        := "airframe",
       description := "Dependency injection library tailored to Scala",
@@ -355,41 +354,12 @@ lazy val di =
       diMacros
     )
 
-lazy val diJVM = di.jvm
-lazy val diJS  = di.js
-
 def crossBuildSources(scalaBinaryVersion: String, baseDir: String, srcType: String = "main"): Seq[sbt.File] = {
   val scalaMajorVersion = scalaBinaryVersion.split("\\.").head
   for (suffix <- Seq("", s"-${scalaBinaryVersion}", s"-${scalaMajorVersion}").distinct)
     yield {
       file(s"${baseDir}/src/${srcType}/scala${suffix}")
     }
-}
-
-def dottyCrossBuildSettings: Seq[Setting[_]] = {
-  Seq(
-    crossScalaVersions := {
-      if (DOTTY) withDotty else targetScalaVersions
-    }
-    // This setting becomes unnecessary as sbt-crossproject support Scala version specific folders
-//    Compile / unmanagedSourceDirectories := {
-//      val origDirs = (Compile / unmanagedSourceDirectories).value
-//      val newDirs = crossBuildSources(
-//        scalaBinaryVersion.value,
-//        baseDirectory.value.getParent
-//      )
-//      (origDirs ++ newDirs).distinct
-//    },
-//    Test / unmanagedSourceDirectories := {
-//      val origDirs = (Test / unmanagedSourceDirectories).value
-//      val newDirs = crossBuildSources(
-//        scalaBinaryVersion.value,
-//        baseDirectory.value.getParent,
-//        srcType = "test"
-//      )
-//      (origDirs ++ newDirs).distinct
-//    }
-  )
 }
 
 // Airframe DI needs to call macro methods, so we needed to split the project into DI and DI macros.
@@ -399,16 +369,12 @@ lazy val diMacros =
     .crossType(CrossType.Pure)
     .in(file("airframe-di-macros"))
     .settings(buildSettings)
-    .settings(dottyCrossBuildSettings)
     .settings(
       name        := "airframe-di-macros",
       description := "Macros for Airframe Di"
     )
     .jsSettings(jsBuildSettings)
     .dependsOn(log, surface)
-
-lazy val diMacrosJVM = diMacros.jvm
-lazy val diMacrosJS  = diMacros.js
 
 // // To use airframe in other airframe modules, we need to reference airframeMacros project
 // lazy val airframeMacrosJVMRef = airframeMacrosJVM % Optional
@@ -441,7 +407,6 @@ lazy val surface =
     .crossType(CrossType.Pure)
     .in(file("airframe-surface"))
     .settings(buildSettings)
-    .settings(dottyCrossBuildSettings)
     .settings(
       name                                         := "airframe-surface",
       description                                  := "A library for extracting object structure surface",
@@ -458,9 +423,6 @@ lazy val surface =
     .jsSettings(jsBuildSettings)
     .dependsOn(log)
 
-lazy val surfaceJVM = surface.jvm
-lazy val surfaceJS  = surface.js
-
 lazy val canvas =
   project
     .in(file("airframe-canvas"))
@@ -469,7 +431,7 @@ lazy val canvas =
       name        := "airframe-canvas",
       description := "Airframe off-heap memory library"
     )
-    .dependsOn(logJVM, controlJVM % Test)
+    .dependsOn(log.jvm, control.jvm % Test)
 
 lazy val config =
   project
@@ -482,7 +444,7 @@ lazy val config =
         "org.yaml" % "snakeyaml" % SNAKE_YAML_VERSION
       )
     )
-    .dependsOn(diJVM, codecJVM)
+    .dependsOn(di.jvm, codec.jvm)
 
 lazy val control =
   crossProject(JVMPlatform, JSPlatform)
@@ -495,9 +457,6 @@ lazy val control =
     )
     .jsSettings(jsBuildSettings)
     .dependsOn(log)
-
-lazy val controlJVM = control.jvm
-lazy val controlJS  = control.js
 
 lazy val ulid =
   crossProject(JVMPlatform, JSPlatform)
@@ -515,9 +474,6 @@ lazy val ulid =
     )
     .dependsOn(log % Test)
 
-lazy val ulidJVM = ulid.jvm
-lazy val ulidJS  = ulid.js
-
 lazy val jmx =
   project
     .in(file("airframe-jmx"))
@@ -528,7 +484,7 @@ lazy val jmx =
       // Do not run tests concurrently to avoid JMX registration failures
       runTestSequentially
     )
-    .dependsOn(surfaceJVM)
+    .dependsOn(surface.jvm)
 
 lazy val launcher =
   project
@@ -538,7 +494,7 @@ lazy val launcher =
       name        := "airframe-launcher",
       description := "Command-line program launcher"
     )
-    .dependsOn(surfaceJVM, controlJVM, codecJVM)
+    .dependsOn(surface.jvm, control.jvm, codec.jvm)
 
 val logDependencies = { scalaVersion: String =>
   scalaVersion match {
@@ -551,7 +507,7 @@ val logDependencies = { scalaVersion: String =>
 
 val logJVMDependencies = Seq(
   // For rotating log files
-  "ch.qos.logback" % "logback-core" % "1.2.11"
+  "ch.qos.logback" % "logback-core" % "1.3.4"
 )
 
 // airframe-log should have minimum dependencies
@@ -560,7 +516,6 @@ lazy val log: sbtcrossproject.CrossProject =
     .crossType(CrossType.Pure)
     .in(file("airframe-log"))
     .settings(buildSettings)
-    .settings(dottyCrossBuildSettings)
     .settings(
       name        := "airframe-log",
       description := "Fancy logger for Scala",
@@ -581,9 +536,6 @@ lazy val log: sbtcrossproject.CrossProject =
       )
     )
 
-lazy val logJVM = log.jvm
-lazy val logJS  = log.js
-
 lazy val metrics =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
@@ -595,9 +547,6 @@ lazy val metrics =
     )
     .jsSettings(jsBuildSettings)
     .dependsOn(log, surface)
-
-lazy val metricsJVM = metrics.jvm
-lazy val metricsJS  = metrics.js
 
 lazy val msgpack =
   crossProject(JVMPlatform, JSPlatform)
@@ -618,15 +567,11 @@ lazy val msgpack =
     )
     .dependsOn(log, json)
 
-lazy val msgpackJVM = msgpack.jvm
-lazy val msgpackJS  = msgpack.js
-
 lazy val codec =
   crossProject(JVMPlatform, JSPlatform)
     .crossType(CrossType.Pure)
     .in(file("airframe-codec"))
     .settings(buildSettings)
-    .settings(dottyCrossBuildSettings)
     .settings(
       // TODO: #1698 Avoid "illegal multithreaded access to ContextBase error" on Scala 3
       // Tests in this project are sequentially executed
@@ -645,9 +590,6 @@ lazy val codec =
     )
     .dependsOn(log, surface, msgpack, metrics, json, control, ulid)
 
-lazy val codecJVM = codec.jvm
-lazy val codecJS  = codec.js
-
 lazy val jdbc =
   project
     .in(file("airframe-jdbc"))
@@ -657,13 +599,13 @@ lazy val jdbc =
       description := "JDBC connection pool service",
       libraryDependencies ++= Seq(
         "org.xerial"     % "sqlite-jdbc" % SQLITE_JDBC_VERSION,
-        "org.postgresql" % "postgresql"  % "42.4.0",
+        "org.postgresql" % "postgresql"  % "42.5.0",
         "com.zaxxer"     % "HikariCP"    % "5.0.1",
         // For routing slf4j log to airframe-log
         "org.slf4j" % "slf4j-jdk14" % SLF4J_VERSION
       )
     )
-    .dependsOn(diJVM, controlJVM, config)
+    .dependsOn(di.jvm, control.jvm, config)
 
 lazy val rx =
   crossProject(JVMPlatform, JSPlatform)
@@ -682,12 +624,9 @@ lazy val rx =
     .jsSettings(
       jsBuildSettings,
       // For addressing the fairness issue of the global ExecutorContext https://github.com/scala-js/scala-js/issues/4129
-      libraryDependencies += "org.scala-js" %%% "scala-js-macrotask-executor" % "1.0.0"
+      libraryDependencies += "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.0"
     )
     .dependsOn(log)
-
-lazy val rxJVM = rx.jvm
-lazy val rxJS  = rx.js
 
 lazy val http =
   crossProject(JVMPlatform, JSPlatform)
@@ -695,7 +634,6 @@ lazy val http =
     .enablePlugins(BuildInfoPlugin)
     .in(file("airframe-http"))
     .settings(buildSettings)
-    .settings(dottyCrossBuildSettings)
     .settings(
       name             := "airframe-http",
       description      := "REST and RPC Framework",
@@ -722,9 +660,6 @@ lazy val http =
     )
     .dependsOn(rx, control, surface, json, codec)
 
-lazy val httpJVM = http.jvm
-lazy val httpJS  = http.js
-
 lazy val httpRouter =
   project
     .in(file("airframe-http-router"))
@@ -733,21 +668,22 @@ lazy val httpRouter =
       name        := "airframe-http-router",
       description := "Request routing library"
     )
-    .dependsOn(diJVM, httpJVM)
+    .dependsOn(di.jvm, http.jvm)
 
 lazy val httpCodeGen =
   project
     .in(file("airframe-http-codegen"))
     .enablePlugins(PackPlugin)
     .settings(buildSettings)
+    .settings(scala2Only)
     .settings(
       name               := "airframe-http-codegen",
       description        := "REST and RPC code generator",
       packMain           := Map("airframe-http-code-generator" -> "wvlet.airframe.http.codegen.HttpCodeGenerator"),
-      packExcludeLibJars := Seq("airspec_2.12", "airspec_2.13"),
+      packExcludeLibJars := Seq("airspec_2.12", "airspec_2.13", "airspec_3"),
       libraryDependencies ++= Seq(
         // Use swagger-parser only for validating YAML format in tests
-        "io.swagger.parser.v3" % "swagger-parser" % "2.1.1" % Test,
+        "io.swagger.parser.v3" % "swagger-parser" % "2.1.9" % Test,
         // Swagger includes dependency to SLF4J, so redirect slf4j logs to airframe-log
         "org.slf4j" % "slf4j-jdk14" % SLF4J_VERSION % Test,
         // For gRPC route scanner test
@@ -758,10 +694,24 @@ lazy val httpCodeGen =
     )
     .dependsOn(httpRouter, launcher)
 
+lazy val netty =
+  project
+    .in(file("airframe-http-netty"))
+    .settings(buildSettings)
+    .settings(
+      name        := "airframe-http-netty",
+      description := "Airframe HTTP Netty backend",
+      libraryDependencies ++= Seq(
+        "io.netty" % "netty-all" % "4.1.85.Final"
+      )
+    )
+    .dependsOn(httpRouter, rx.jvm)
+
 lazy val grpc =
   project
     .in(file("airframe-http-grpc"))
     .settings(buildSettings)
+    .settings(scala2Only)
     .settings(
       name        := "airframe-http-grpc",
       description := "Airframe HTTP gRPC backend",
@@ -772,7 +722,7 @@ lazy val grpc =
         "org.slf4j"         % "slf4j-jdk14"       % SLF4J_VERSION % Test
       )
     )
-    .dependsOn(httpRouter, rxJVM)
+    .dependsOn(httpRouter, rx.jvm)
 
 // Workaround for com.twitter:util-core_2.12:21.4.0 (depends on 1.1.2)
 ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" %% "scala-parser-combinators" % "always"
@@ -781,15 +731,16 @@ lazy val finagle =
   project
     .in(file("airframe-http-finagle"))
     .settings(buildSettings)
+    .settings(scala2Only)
     .settings(
       name        := "airframe-http-finagle",
       description := "REST API binding for Finagle",
       // Finagle doesn't support Scala 2.13 yet
       libraryDependencies ++= Seq(
-        "com.twitter" %% "finagle-http"        % FINAGLE_VERSION,
-        "com.twitter" %% "finagle-netty4-http" % FINAGLE_VERSION,
-        "com.twitter" %% "finagle-netty4"      % FINAGLE_VERSION,
-        "com.twitter" %% "finagle-core"        % FINAGLE_VERSION,
+        ("com.twitter" %% "finagle-http"        % FINAGLE_VERSION).cross(CrossVersion.for3Use2_13),
+        ("com.twitter" %% "finagle-netty4-http" % FINAGLE_VERSION).cross(CrossVersion.for3Use2_13),
+        ("com.twitter" %% "finagle-netty4"      % FINAGLE_VERSION).cross(CrossVersion.for3Use2_13),
+        ("com.twitter" %% "finagle-core"        % FINAGLE_VERSION).cross(CrossVersion.for3Use2_13),
         // Redirecting slf4j log in Finagle to airframe-log
         "org.slf4j" % "slf4j-jdk14" % SLF4J_VERSION,
         // Use a version that fixes [CVE-2017-18640]
@@ -802,6 +753,7 @@ lazy val okhttp =
   project
     .in(file("airframe-http-okhttp"))
     .settings(buildSettings)
+    .settings(scala2Only)
     .settings(
       name        := "airframe-http-okhttp",
       description := "REST API binding for OkHttp",
@@ -809,12 +761,13 @@ lazy val okhttp =
         "com.squareup.okhttp3" % "okhttp" % "4.10.0"
       )
     )
-    .dependsOn(httpJVM, finagle % Test)
+    .dependsOn(http.jvm, finagle % Test)
 
 lazy val httpRecorder =
   project
     .in(file("airframe-http-recorder"))
     .settings(buildSettings)
+    .settings(scala2Only)
     .settings(
       name        := "airframe-http-recorder",
       description := "Http Response Recorder",
@@ -827,7 +780,7 @@ lazy val httpRecorder =
         "org.slf4j" % "slf4j-jdk14" % SLF4J_VERSION
       )
     )
-    .dependsOn(codecJVM, metricsJVM, controlJVM, finagle, jdbc)
+    .dependsOn(codec.jvm, metrics.jvm, control.jvm, finagle, jdbc)
 
 lazy val json =
   crossProject(JSPlatform, JVMPlatform)
@@ -841,9 +794,6 @@ lazy val json =
     .jsSettings(jsBuildSettings)
     .dependsOn(log)
 
-lazy val jsonJVM = json.jvm
-lazy val jsonJS  = json.js
-
 lazy val benchmark =
   project
     .in(file("airframe-benchmark"))
@@ -851,6 +801,7 @@ lazy val benchmark =
     .enablePlugins(JmhPlugin, PackPlugin)
     .settings(buildSettings)
     .settings(noPublish)
+    .settings(scala2Only)
     .settings(
       name     := "airframe-benchmark",
       packMain := Map("airframe-benchmark" -> "wvlet.airframe.benchmark.BenchmarkMain"),
@@ -870,13 +821,13 @@ lazy val benchmark =
         "org.openjdk.jmh" % "jmh-generator-bytecode"   % JMH_VERSION,
         "org.openjdk.jmh" % "jmh-generator-reflection" % JMH_VERSION,
         // Used only for json benchmark
-        "org.json4s" %% "json4s-jackson" % "4.0.5",
-        "io.circe"   %% "circe-parser"   % "0.14.2",
+        "org.json4s" %% "json4s-jackson" % "4.0.6",
+        "io.circe"   %% "circe-parser"   % "0.14.3",
         // For ScalaPB
         // "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
         // For grpc-java
         "io.grpc"             % "grpc-protobuf" % GRPC_VERSION,
-        "com.google.protobuf" % "protobuf-java" % "3.21.1",
+        "com.google.protobuf" % "protobuf-java" % "3.21.9",
         "com.chatwork"       %% "scala-ulid"    % "1.0.24"
       )
       //      Compile / PB.targets := Seq(
@@ -885,7 +836,7 @@ lazy val benchmark =
       // publishing .tgz
       // publishPackArchiveTgz
     )
-    .dependsOn(msgpackJVM, jsonJVM, metricsJVM, launcher, httpCodeGen, finagle, grpc, ulidJVM)
+    .dependsOn(msgpack.jvm, json.jvm, metrics.jvm, launcher, httpCodeGen, finagle, netty, grpc, ulid.jvm)
 
 lazy val fluentd =
   project
@@ -904,15 +855,15 @@ lazy val fluentd =
         "org.slf4j" % "slf4j-jdk14" % SLF4J_VERSION
       )
     )
-    .dependsOn(codecJVM, diJVM)
+    .dependsOn(codec.jvm, di.jvm)
 
 def sqlRefLib = { scalaVersion: String =>
-  if (scalaVersion.startsWith("2.12")) {
+  if (scalaVersion.startsWith("2.13")) {
     Seq(
       // Include Spark just as a reference implementation
-      "org.apache.spark" %% "spark-sql" % "3.3.0" % Test,
+      "org.apache.spark" %% "spark-sql" % "3.3.1" % Test,
       // Include Trino as a reference implementation
-      "io.trino" % "trino-main" % "387" % Test
+      "io.trino" % "trino-main" % "403" % Test
     )
   } else {
     Seq.empty
@@ -928,17 +879,17 @@ lazy val parquet =
       description := "Parquet columnar format reader/writer support",
       libraryDependencies ++= Seq(
         "org.apache.parquet" % "parquet-hadoop" % PARQUET_VERSION,
-        "org.apache.hadoop"  % "hadoop-client"  % "3.3.3" % Provided,
+        "org.apache.hadoop"  % "hadoop-client"  % "3.3.4" % Provided,
         // For S3 support
-        "org.apache.hadoop"      % "hadoop-aws" % "3.3.3"    % Provided,
-        "software.amazon.awssdk" % "auth"       % "2.17.217" % Provided,
+        "org.apache.hadoop"      % "hadoop-aws" % "3.3.4"    % Provided,
+        "software.amazon.awssdk" % "auth"       % "2.17.293" % Provided,
         // For Apple Silicon (M1)
         "org.xerial.snappy"  % "snappy-java"  % "1.1.8.4",
         "org.slf4j"          % "slf4j-jdk14"  % SLF4J_VERSION   % Optional,
         "org.apache.parquet" % "parquet-avro" % PARQUET_VERSION % Test
       )
     )
-    .dependsOn(codecJVM, sql)
+    .dependsOn(codec.jvm, sql)
 
 lazy val sql =
   project
@@ -948,7 +899,7 @@ lazy val sql =
     .settings(
       name                       := "airframe-sql",
       description                := "SQL parser & analyzer",
-      Antlr4 / antlr4Version     := "4.10.1",
+      Antlr4 / antlr4Version     := "4.11.1",
       Antlr4 / antlr4PackageName := Some("wvlet.airframe.sql.parser"),
       Antlr4 / antlr4GenListener := true,
       Antlr4 / antlr4GenVisitor  := true,
@@ -957,7 +908,7 @@ lazy val sql =
         "org.scala-lang.modules" %% "scala-parser-combinators" % SCALA_PARSER_COMBINATOR_VERSION
       ) ++ sqlRefLib(scalaVersion.value)
     )
-    .dependsOn(msgpackJVM, surfaceJVM, config, launcher)
+    .dependsOn(msgpack.jvm, surface.jvm, config, launcher)
 
 lazy val rxHtml =
   crossProject(JVMPlatform, JSPlatform)
@@ -983,9 +934,6 @@ lazy val rxHtml =
     )
     .dependsOn(log, rx, surface)
 
-lazy val rxHtmlJVM = rxHtml.jvm
-lazy val rxHtmlJS  = rxHtml.js
-
 lazy val widgetJS =
   project
     .enablePlugins(ScalaJSPlugin) // , ScalaJSBundlerPlugin)
@@ -1000,7 +948,7 @@ lazy val widgetJS =
       // useYarn := true
       //      npmDependencies in Test += "node" -> "12.14.1"
     )
-    .dependsOn(logJS, rxHtmlJS)
+    .dependsOn(log.js, rxHtml.js)
 
 lazy val examples =
   project
@@ -1010,14 +958,15 @@ lazy val examples =
     .settings(
       name        := "airframe-examples",
       description := "Airframe examples",
+      crossScalaVersions ++= targetScalaVersions,
       libraryDependencies ++= Seq(
       )
     )
     .dependsOn(
-      codecJVM,
+      codec.jvm,
       config,
-      diJVM,
-      diMacrosJVM,
+      di.jvm,
+      diMacros.jvm,
       launcher,
       jmx,
       jdbc,
@@ -1033,7 +982,7 @@ lazy val dottyTest =
     .settings(
       name               := "airframe-dotty-test",
       description        := "test for dotty",
-      scalaVersion       := SCALA_3_0,
-      crossScalaVersions := List(SCALA_3_0)
+      scalaVersion       := SCALA_3,
+      crossScalaVersions := List(SCALA_3)
     )
-    .dependsOn(logJVM, surfaceJVM, diJVM, codecJVM)
+    .dependsOn(log.jvm, surface.jvm, di.jvm, codec.jvm)
