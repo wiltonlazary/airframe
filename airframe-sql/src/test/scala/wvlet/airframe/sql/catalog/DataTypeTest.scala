@@ -18,7 +18,7 @@ import wvlet.airspec.AirSpec
 
 class DataTypeTest extends AirSpec {
   protected def parse(t: String, expected: DataType): Unit = {
-    debug(s"parse ${t}")
+    trace(s"parse ${t}")
     val parsed = DataType.parse(t)
     parsed shouldBe expected
   }
@@ -44,9 +44,9 @@ class DataTypeTest extends AirSpec {
   }
 
   test("parse decimal types") {
-    parse("decimal(10,2)", DecimalType(10, 2))
-    parse("decimal(34,0)", DecimalType(34, 0))
-    parse("decimal(34, 0)", DecimalType(34, 0))
+    parse("decimal(10,2)", DecimalType.of(10, 2))
+    parse("decimal(34,0)", DecimalType.of(34, 0))
+    parse("decimal(34, 0)", DecimalType.of(34, 0))
   }
 
   test("parse timestamp types") {

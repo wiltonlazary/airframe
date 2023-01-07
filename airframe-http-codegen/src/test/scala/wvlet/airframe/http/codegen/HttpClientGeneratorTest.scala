@@ -17,20 +17,25 @@ import example.api._
 import wvlet.airframe.http._
 import wvlet.airframe.http.codegen.client.{AsyncClientGenerator, GrpcClientGenerator}
 import wvlet.airspec.AirSpec
+import wvlet.airframe.http.Router
 
 /**
   */
 class HttpClientGeneratorTest extends AirSpec {
-  val router =
+  private val router = if (isScala3) {
+    // In Scala 3, reflection-based router will not be supported
+    Router.add[ResourceApi].add[QueryApi].add[BookApi]
+  } else {
     RouteScanner.buildRouter(Seq(classOf[ResourceApi], classOf[QueryApi], classOf[BookApi]))
+  }
 
   test("build router") {
     debug(router)
 
-    val r = router.routes.find(x => x.method == HttpMethod.GET && x.path == "/v1/resources/:id")
+    val r = router.routes.find(x => x.httpMethod == HttpMethod.GET && x.path == "/v1/resources/:id")
     r shouldBe defined
 
-    val q = router.routes.find(x => x.method == HttpMethod.GET && x.path == "/v1/query")
+    val q = router.routes.find(x => x.httpMethod == HttpMethod.GET && x.path == "/v1/query")
     q shouldBe defined
   }
 

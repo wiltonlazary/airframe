@@ -91,12 +91,12 @@ class SQLInterpreter(withNodeLocation: Boolean = true) extends SqlBaseBaseVisito
   }
 
   override def visitNamedQuery(ctx: NamedQueryContext): WithQuery = {
-    val name = visitIdentifier(ctx.name)
+    val name = visitIdentifier(ctx.name).toResolved
     val columnAliases = Option(ctx.columnAliases()).map { x =>
       x.identifier()
         .asScala
         .map { i =>
-          visitIdentifier(i)
+          visitIdentifier(i).toResolved
         }
         .toSeq
     }
@@ -334,7 +334,9 @@ class SQLInterpreter(withNodeLocation: Boolean = true) extends SqlBaseBaseVisito
 
     ctx.identifier() match {
       case i: IdentifierContext =>
-        AliasedRelation(r, visitIdentifier(i), None, getLocation(ctx))
+        val columnNames = Option(ctx.columnAliases()).map(_.identifier().asScala.map(_.getText).toSeq)
+        // table alias name is always resolved identifier
+        AliasedRelation(r, visitIdentifier(i).toResolved, columnNames, getLocation(ctx))
       case other =>
         r
     }
@@ -383,20 +385,22 @@ class SQLInterpreter(withNodeLocation: Boolean = true) extends SqlBaseBaseVisito
   }
 
   override def visitDereference(ctx: DereferenceContext): Attribute = {
-    UnresolvedAttribute(s"${ctx.base.getText}.${ctx.fieldName.getText}", getLocation(ctx))
+    val qualifier = if (ctx.base.getText.isEmpty) None else Some(ctx.base.getText)
+    UnresolvedAttribute(qualifier, ctx.fieldName.getText, getLocation(ctx))
   }
 
   override def visitSelectAll(ctx: SelectAllContext): Attribute = {
     // TODO parse qName
     ctx.qualifiedName()
-    AllColumns(None, getLocation(ctx))
+    AllColumns(None, None, getLocation(ctx))
   }
 
   override def visitSelectSingle(ctx: SelectSingleContext): Attribute = {
     val alias = Option(ctx.AS())
       .map(x => expression(ctx.identifier()))
       .orElse(Option(ctx.identifier()).map(expression(_)))
-    SingleColumn(expression(ctx.expression()), alias, None, getLocation(ctx))
+    SingleColumn(expression(ctx.expression()), None, getLocation(ctx))
+      .withAlias(alias.map(_.sqlExpr))
   }
 
   override def visitExpression(ctx: ExpressionContext): Expression = {
@@ -729,7 +733,7 @@ class SQLInterpreter(withNodeLocation: Boolean = true) extends SqlBaseBaseVisito
     if (ctx.ASTERISK() != null) {
       FunctionCall(
         name,
-        Seq(AllColumns(None, getLocation(ctx))),
+        Seq(AllColumns(None, None, getLocation(ctx))),
         isDistinct,
         filter,
         over,

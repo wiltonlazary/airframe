@@ -14,8 +14,8 @@
 package wvlet.airframe.http.codegen
 
 import wvlet.airframe.http.{HttpContext, HttpContextBase, HttpMessage, HttpRequest}
-import wvlet.airframe.http.router.Route
 import wvlet.airframe.surface.{CName, MethodParameter}
+import wvlet.airframe.http.router.Route
 
 import scala.language.higherKinds
 
@@ -25,6 +25,7 @@ import scala.language.higherKinds
 object RouteAnalyzer {
 
   case class RouteAnalysisResult(
+      route: Route,
       // A path string generator code using string interpolation
       pathString: String,
       // User-input parameters for the client method
@@ -92,6 +93,7 @@ object RouteAnalyzer {
     }
 
     RouteAnalysisResult(
+      route = route,
       pathString = path,
       userInputParameters = clientSideArgs,
       pathOnlyArgs

@@ -17,10 +17,11 @@ import io.netty.buffer.Unpooled
 import io.netty.channel.{ChannelFutureListener, ChannelHandlerContext, SimpleChannelInboundHandler}
 import io.netty.handler.codec.http._
 import wvlet.airframe.http.HttpMessage.{Request, Response}
-import wvlet.airframe.http.{Http, HttpMethod, HttpStatus}
+import wvlet.airframe.http.{Http, HttpMethod, HttpServerException, HttpStatus, ServerAddress}
 import wvlet.airframe.rx.{OnCompletion, OnError, OnNext, Rx, RxRunner}
 import wvlet.log.LogSupport
 
+import java.net.InetSocketAddress
 import scala.jdk.CollectionConverters._
 
 class NetthRequestHandler(config: NettyServerConfig, dispatcher: NettyBackend.Filter)
@@ -48,6 +49,13 @@ class NetthRequestHandler(config: NettyServerConfig, dispatcher: NettyBackend.Fi
       case _                  => ???
     }
 
+    ctx.channel().remoteAddress() match {
+      case x: InetSocketAddress =>
+        // TODO This address might be IPv6
+        req = req.withRemoteAddress(ServerAddress(s"${x.getHostString}:${x.getPort}"))
+      case _ =>
+    }
+
     msg.headers().names().asScala.map { x =>
       req = req.withHeader(x, msg.headers().get(x))
     }
@@ -71,18 +79,21 @@ class NetthRequestHandler(config: NettyServerConfig, dispatcher: NettyBackend.Fi
         val nettyResponse = toNettyResponse(v.asInstanceOf[Response])
         writeResponse(msg, ctx, nettyResponse)
       case OnError(ex) =>
-        warn(ex)
-        val resp = new DefaultHttpResponse(
-          HttpVersion.HTTP_1_1,
-          HttpResponseStatus.valueOf(HttpStatus.InternalServerError_500.code)
-        )
+        val resp = ex match {
+          case ex: HttpServerException => toNettyResponse(ex.toResponse)
+          case _ =>
+            new DefaultHttpResponse(
+              HttpVersion.HTTP_1_1,
+              HttpResponseStatus.valueOf(HttpStatus.InternalServerError_500.code)
+            )
+        }
         writeResponse(msg, ctx, resp)
       case OnCompletion =>
     }
   }
 
   private def writeResponse(req: HttpRequest, ctx: ChannelHandlerContext, resp: DefaultHttpResponse): Unit = {
-    val keepAlive = HttpUtil.isKeepAlive(req)
+    val keepAlive = HttpStatus.ofCode(resp.status().code()).isSuccessful && HttpUtil.isKeepAlive(req)
     if (keepAlive) {
       if (!req.protocolVersion().isKeepAliveDefault) {
         resp.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE)

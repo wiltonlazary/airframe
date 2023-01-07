@@ -9,18 +9,18 @@ val targetScalaVersions = SCALA_3 :: uptoScala2
 // Add this for using snapshot versions
 // ThisBuild / resolvers += Resolver.sonatypeRepo("snapshots")
 
-val AIRSPEC_VERSION                 = "22.11.1"
+val AIRSPEC_VERSION                 = "22.12.5"
 val SCALACHECK_VERSION              = "1.17.0"
 val MSGPACK_VERSION                 = "0.9.3"
 val SCALA_PARSER_COMBINATOR_VERSION = "2.1.1"
-val SQLITE_JDBC_VERSION             = "3.39.4.0"
-val SLF4J_VERSION                   = "2.0.3"
+val SQLITE_JDBC_VERSION             = "3.40.0.0"
+val SLF4J_VERSION                   = "2.0.6"
 val JS_JAVA_LOGGING_VERSION         = "1.0.0"
 val JS_JAVA_TIME_VERSION            = "1.0.0"
 val SCALAJS_DOM_VERSION             = "2.3.0"
-val FINAGLE_VERSION                 = "22.7.0"
+val FINAGLE_VERSION                 = "22.12.0"
 val FLUENCY_VERSION                 = "2.7.0"
-val GRPC_VERSION                    = "1.50.2"
+val GRPC_VERSION                    = "1.51.1"
 val JMH_VERSION                     = "1.36"
 val JAVAX_ANNOTATION_API_VERSION    = "1.3.2"
 val PARQUET_VERSION                 = "1.12.3"
@@ -116,7 +116,7 @@ val buildSettings = Seq[Setting[_]](
     if (scalaVersion.value.startsWith("3."))
       Seq.empty
     else
-      Seq("org.scala-lang.modules" %%% "scala-collection-compat" % "2.8.1")
+      Seq("org.scala-lang.modules" %%% "scala-collection-compat" % "2.9.0")
   }
 )
 
@@ -133,8 +133,11 @@ ThisBuild / publishTo := sonatypePublishToBundle.value
 
 val jsBuildSettings = Seq[Setting[_]](
   // #2117 For using java.util.UUID.randomUUID() in Scala.js
-  libraryDependencies += ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test)
-    .cross(CrossVersion.for3Use2_13),
+  libraryDependencies ++= Seq(
+    ("org.scala-js" %%% "scalajs-java-securerandom" % "1.0.0" % Test).cross(CrossVersion.for3Use2_13),
+    // TODO It should be included in AirSpec
+    "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.1" % Test
+  ),
   coverageEnabled := false
 )
 
@@ -187,7 +190,6 @@ lazy val communityBuildProjects: Seq[ProjectReference] = Seq(
   msgpack.jvm,
   rx.jvm,
   http.jvm,
-  httpRouter,
   httpCodeGen,
   grpc,
   json.jvm,
@@ -260,14 +262,12 @@ lazy val projectDotty =
       codec.jvm,
       fluentd,
       http.jvm,
-      httpRouter,
-      // Surface.of(Class[_]) needs to be supported
-      // httpCodeGen
+      httpCodeGen,
       // Finagle is used in the http recorder
       // httpRecorder
       // // Finagle isn't supporting Scala 3
       // httpFinagle,
-      // grpc,
+      grpc,
       jdbc,
       jmx,
       launcher,
@@ -507,7 +507,7 @@ val logDependencies = { scalaVersion: String =>
 
 val logJVMDependencies = Seq(
   // For rotating log files
-  "ch.qos.logback" % "logback-core" % "1.3.4"
+  "ch.qos.logback" % "logback-core" % "1.3.5"
 )
 
 // airframe-log should have minimum dependencies
@@ -599,7 +599,7 @@ lazy val jdbc =
       description := "JDBC connection pool service",
       libraryDependencies ++= Seq(
         "org.xerial"     % "sqlite-jdbc" % SQLITE_JDBC_VERSION,
-        "org.postgresql" % "postgresql"  % "42.5.0",
+        "org.postgresql" % "postgresql"  % "42.5.1",
         "com.zaxxer"     % "HikariCP"    % "5.0.1",
         // For routing slf4j log to airframe-log
         "org.slf4j" % "slf4j-jdk14" % SLF4J_VERSION
@@ -624,7 +624,7 @@ lazy val rx =
     .jsSettings(
       jsBuildSettings,
       // For addressing the fairness issue of the global ExecutorContext https://github.com/scala-js/scala-js/issues/4129
-      libraryDependencies += "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.0"
+      libraryDependencies += "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.1"
     )
     .dependsOn(log)
 
@@ -658,24 +658,13 @@ lazy val http =
         "org.scala-js" %%% "scalajs-dom" % SCALAJS_DOM_VERSION
       )
     )
-    .dependsOn(rx, control, surface, json, codec)
-
-lazy val httpRouter =
-  project
-    .in(file("airframe-http-router"))
-    .settings(buildSettings)
-    .settings(
-      name        := "airframe-http-router",
-      description := "Request routing library"
-    )
-    .dependsOn(di.jvm, http.jvm)
+    .dependsOn(rx, control, surface, json, codec, di)
 
 lazy val httpCodeGen =
   project
     .in(file("airframe-http-codegen"))
     .enablePlugins(PackPlugin)
     .settings(buildSettings)
-    .settings(scala2Only)
     .settings(
       name               := "airframe-http-codegen",
       description        := "REST and RPC code generator",
@@ -692,7 +681,7 @@ lazy val httpCodeGen =
       // Published package is necessary for sbt-airframe
       publishPackArchiveTgz
     )
-    .dependsOn(httpRouter, launcher)
+    .dependsOn(http.jvm, launcher)
 
 lazy val netty =
   project
@@ -702,16 +691,15 @@ lazy val netty =
       name        := "airframe-http-netty",
       description := "Airframe HTTP Netty backend",
       libraryDependencies ++= Seq(
-        "io.netty" % "netty-all" % "4.1.85.Final"
+        "io.netty" % "netty-all" % "4.1.86.Final"
       )
     )
-    .dependsOn(httpRouter, rx.jvm)
+    .dependsOn(http.jvm, rx.jvm)
 
 lazy val grpc =
   project
     .in(file("airframe-http-grpc"))
     .settings(buildSettings)
-    .settings(scala2Only)
     .settings(
       name        := "airframe-http-grpc",
       description := "Airframe HTTP gRPC backend",
@@ -722,7 +710,7 @@ lazy val grpc =
         "org.slf4j"         % "slf4j-jdk14"       % SLF4J_VERSION % Test
       )
     )
-    .dependsOn(httpRouter, rx.jvm)
+    .dependsOn(http.jvm, rx.jvm)
 
 // Workaround for com.twitter:util-core_2.12:21.4.0 (depends on 1.1.2)
 ThisBuild / libraryDependencySchemes += "org.scala-lang.modules" %% "scala-parser-combinators" % "always"
@@ -747,7 +735,7 @@ lazy val finagle =
         "org.yaml" % "snakeyaml" % SNAKE_YAML_VERSION
       )
     )
-    .dependsOn(httpRouter)
+    .dependsOn(http.jvm)
 
 lazy val okhttp =
   project
@@ -761,7 +749,7 @@ lazy val okhttp =
         "com.squareup.okhttp3" % "okhttp" % "4.10.0"
       )
     )
-    .dependsOn(http.jvm, finagle % Test)
+    .dependsOn(http.jvm, netty % Test)
 
 lazy val httpRecorder =
   project
@@ -809,7 +797,7 @@ lazy val benchmark =
       // java.lang.RuntimeException: ERROR: Unable to find the resource: /META-INF/BenchmarkList
       turbo := false,
       // Generate JMH benchmark cord before packaging and testing
-      pack                  := pack.dependsOn(Test / compile).value,
+      Compile / pack        := (Compile / pack).dependsOn(Test / compile).value,
       Jmh / sourceDirectory := (Compile / sourceDirectory).value,
       Jmh / compile         := (Jmh / compile).triggeredBy(Compile / compile).value,
       Test / compile        := ((Test / compile).dependsOn(Jmh / compile)).value,
@@ -827,7 +815,7 @@ lazy val benchmark =
         // "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
         // For grpc-java
         "io.grpc"             % "grpc-protobuf" % GRPC_VERSION,
-        "com.google.protobuf" % "protobuf-java" % "3.21.9",
+        "com.google.protobuf" % "protobuf-java" % "3.21.12",
         "com.chatwork"       %% "scala-ulid"    % "1.0.24"
       )
       //      Compile / PB.targets := Seq(
@@ -863,7 +851,7 @@ def sqlRefLib = { scalaVersion: String =>
       // Include Spark just as a reference implementation
       "org.apache.spark" %% "spark-sql" % "3.3.1" % Test,
       // Include Trino as a reference implementation
-      "io.trino" % "trino-main" % "403" % Test
+      "io.trino" % "trino-main" % "405" % Test
     )
   } else {
     Seq.empty
@@ -905,7 +893,8 @@ lazy val sql =
       Antlr4 / antlr4GenVisitor  := true,
       libraryDependencies ++= Seq(
         // For parsing DataType strings
-        "org.scala-lang.modules" %% "scala-parser-combinators" % SCALA_PARSER_COMBINATOR_VERSION
+        "org.scala-lang.modules"   %% "scala-parser-combinators" % SCALA_PARSER_COMBINATOR_VERSION,
+        "com.github.vertical-blank" % "sql-formatter"            % "2.0.3"
       ) ++ sqlRefLib(scalaVersion.value)
     )
     .dependsOn(msgpack.jvm, surface.jvm, config, launcher)

@@ -19,7 +19,7 @@ import wvlet.airspec.runner.AirSpecSbtRunner.AirSpecConfig
 import wvlet.airspec.spi.{AirSpecContext, AirSpecException}
 import wvlet.log.LogSupport
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -79,19 +79,7 @@ private[airspec] class AirSpecTaskRunner(
       warn(s"No test definition is found in ${name}. Add at least one test(...) method call.")
     }
 
-    val selectedSpecs =
-      config.pattern match {
-        case Some(regex) =>
-          // Find matching methods
-          testDefs.filter { m =>
-            // Concatenate (parent class name)? + class name + method name for handy search
-            val fullName = s"${specName(None, spec)}.${m.name}"
-            regex.findFirstIn(fullName).isDefined
-          }
-        case None =>
-          testDefs
-      }
-
+    val selectedSpecs = testDefs.filter(task => config.specMatcher.matchWith(task.name))
     selectedSpecs
   }
 
@@ -253,18 +241,43 @@ private[airspec] class AirSpecTaskRunner(
           parentContext = parentContext,
           currentSpec = spec,
           testName = m.name,
-          currentSession = childSession
+          currentSession = childSession,
+          config = config
         )
       spec.pushContext(context)
       context
     }
 
     def runTest(childSession: Session, context: AirSpecContext): Future[_] = {
+      import wvlet.airframe.rx._
+
       try {
         m.run(context, childSession) match {
           // When the test case returns a Future, we need to chain the next action
           case future: Future[_] => future
-          case nonFuture         => Future.successful(nonFuture)
+          case rx: Rx[_] =>
+            val p = Promise[Any]()
+            val c: Cancelable = RxRunner.run(rx) {
+              case OnNext(v) =>
+                if (!p.isCompleted) {
+                  p.success(v)
+                }
+              case OnError(e) =>
+                if (!p.isCompleted) {
+                  p.failure(e)
+                }
+              case OnCompletion =>
+                if (!p.isCompleted) {
+                  // Set dummy value
+                  p.success(())
+                }
+            }
+            p.future.transform { (x: Try[_]) =>
+              // Ensure stopping Rx subscription
+              c.cancel
+              x
+            }
+          case nonFuture => Future.successful(nonFuture)
         }
       } catch {
         case e: Throwable => Future.failed(e)
@@ -296,7 +309,7 @@ private[airspec] class AirSpecTaskRunner(
           .transformWith { case result: Try[_] =>
             // Await the child task completion, then report the current spec result
             val childTasks = context.childTests.foldLeft(Future.unit) { case (prev, childTest) =>
-              // After the previos test finishes, start the next child test
+              // After the previous test finishes, start the next child test
               prev.transformWith(_ => childTest())
             }
             childTasks.transform(_ => result)

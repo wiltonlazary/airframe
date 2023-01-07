@@ -17,15 +17,16 @@ import io.grpc.stub.ServerCalls.{BidiStreamingMethod, ClientStreamingMethod, Ser
 import io.grpc.stub.{ClientCallStreamObserver, ServerCallStreamObserver, StreamObserver}
 import wvlet.airframe.codec.{MessageCodec, MessageCodecException, MessageCodecFactory}
 import wvlet.airframe.http
-import wvlet.airframe.http.RPCEncoding
+import wvlet.airframe.http.{RPCEncoding, RPCMethod}
 import wvlet.airframe.http.grpc.{GrpcContext, GrpcResponse}
 import wvlet.airframe.http.internal.RPCCallContext
-import wvlet.airframe.http.router.HttpRequestMapper
+import wvlet.airframe.http.{RPCEncoding, RPCStatus}
+import wvlet.airframe.http.router.{Route, HttpRequestMapper}
 import wvlet.airframe.msgpack.spi.MsgPack
 import wvlet.airframe.msgpack.spi.Value.MapValue
+import wvlet.airframe.rx._
 import wvlet.airframe.surface.{CName, MethodSurface, Surface}
 import wvlet.log.LogSupport
-import wvlet.airframe.rx._
 
 import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.atomic.AtomicBoolean
@@ -38,7 +39,7 @@ import scala.util.{Failure, Success, Try}
   * This handler receives a MessagePack Map value for an RPC request, and call the corresponding controller method
   */
 class GrpcRequestHandler(
-    rpcInterfaceCls: Class[_],
+    rpcMethod: RPCMethod,
     // Controller instance
     controller: Any,
     // Controller method to call for RPC
@@ -50,7 +51,7 @@ class GrpcRequestHandler(
 
   private val argCodecs = methodSurface.args.map(a => codecFactory.of(a.surface))
 
-  private val rpcContext = RPCCallContext(rpcInterfaceCls, methodSurface, Seq.empty)
+  private val rpcContext = RPCCallContext(rpcMethod, methodSurface, Seq.empty)
 
   /**
     * Read the input value (MessagePack or Json) and convert to MessagePack Value
@@ -74,7 +75,7 @@ class GrpcRequestHandler(
         case m: MapValue =>
           m
         case _ =>
-          val e = new IllegalArgumentException(s"Request data is not a MapValue: ${value}")
+          val e = RPCStatus.INVALID_REQUEST_U1.newException(s"Request data is not a MapValue: ${value}")
           reportError(e)
           requestLogger.logError(e, grpcContext, rpcContext)
           throw e
@@ -127,7 +128,7 @@ class GrpcRequestHandler(
         val argOpt = mapValue.get(CName.toCanonicalName(arg.name)) match {
           case Some(paramValue) =>
             Option(argCodecs(i).fromMsgPack(paramValue.toMsgpack)).orElse {
-              throw new IllegalArgumentException(s"Failed to parse ${paramValue} for ${arg}")
+              throw RPCStatus.INVALID_REQUEST_U1.newException(s"Failed to parse ${paramValue} for ${arg}")
             }
           case None =>
             // If no value is found, use the method parameter's default argument
@@ -140,7 +141,7 @@ class GrpcRequestHandler(
           } else {
             val msg = s"No key for ${arg.name} is found in ${m} for calling ${methodSurface}"
             error(msg)
-            throw new IllegalArgumentException(msg)
+            throw RPCStatus.INVALID_REQUEST_U1.newException(msg)
           }
         }
       }

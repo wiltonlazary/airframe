@@ -90,7 +90,7 @@ val buildSettings = Seq[Setting[_]](
     if (scalaVersion.value.startsWith("3."))
       Seq.empty
     else
-      Seq("org.scala-lang.modules" %%% "scala-collection-compat" % "2.8.1")
+      Seq("org.scala-lang.modules" %%% "scala-collection-compat" % "2.9.0")
   }
 )
 
@@ -146,7 +146,7 @@ def excludePomDependency(excludes: Seq[String]) = { node: XmlNode =>
   */
 val airspecLogDependencies  = Seq("airframe-log")
 val airspecCoreDependencies = Seq("airframe-di-macros", "airframe-surface")
-val airspecDependencies     = Seq("airframe-di", "airframe-metrics")
+val airspecDependencies     = Seq("airframe-di", "airframe-metrics", "airframe-rx")
 
 // Setting keys for AirSpec
 val airspecDependsOn =
@@ -213,7 +213,7 @@ lazy val airspecLog =
       airspecJVMBuildSettings,
       libraryDependencies ++= Seq(
         // For rotating log files
-        "ch.qos.logback" % "logback-core" % "1.3.4"
+        "ch.qos.logback" % "logback-core" % "1.3.5"
       )
     )
     .jsSettings(
@@ -299,7 +299,11 @@ lazy val airspecDeps =
       airspecJSBuildSettings,
       Compile / packageBin / mappings ++= (airspecCoreJS / Compile / packageBin / mappings).value
         .filter(x => x._2 != "JS_DEPENDENCIES"),
-      Compile / packageSrc / mappings ++= (airspecCoreJS / Compile / packageSrc / mappings).value
+      Compile / packageSrc / mappings ++= (airspecCoreJS / Compile / packageSrc / mappings).value,
+      libraryDependencies ++= Seq(
+        // Necessary for async testing
+        "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.1"
+      )
     )
     .dependsOn(airspecCore)
 
@@ -347,8 +351,8 @@ lazy val airspec =
       libraryDependencies ++= Seq(
         ("org.scala-js"        %% "scalajs-test-interface" % scalaJSVersion).cross(CrossVersion.for3Use2_13),
         ("org.portable-scala" %%% "portable-scala-reflect" % "1.1.2").cross(CrossVersion.for3Use2_13),
-        // Necessary for async testing
-        "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.0"
+        // Needed to be explicitly included here for running Scala.js tests successfully
+        "org.scala-js" %%% "scala-js-macrotask-executor" % "1.1.1"
       )
     )
     // This should be Optional dependency, but using Provided dependency for bloop which doesn't support Optional.

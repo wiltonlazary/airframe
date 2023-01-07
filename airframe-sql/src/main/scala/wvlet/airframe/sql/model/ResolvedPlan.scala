@@ -15,17 +15,26 @@ package wvlet.airframe.sql.model
 
 import wvlet.airframe.sql.analyzer.QuerySignatureConfig
 import wvlet.airframe.sql.catalog.{Catalog, DataType}
+import wvlet.airframe.sql.model.Expression.Identifier
 import wvlet.airframe.sql.model.LogicalPlan.Relation
+import wvlet.log.LogSupport
 
 /**
   * The lowest level operator to access a table
+  * @param fullName
+  *   original table reference name in SQL. Used for generating SQL text
+  *
   * @param table
   *   source table
   * @param columns
   *   projectec columns
   */
-case class TableScan(table: Catalog.Table, columns: Seq[Catalog.TableColumn], nodeLocation: Option[NodeLocation])
-    extends Relation
+case class TableScan(
+    fullName: String,
+    table: Catalog.Table,
+    columns: Seq[Catalog.TableColumn],
+    nodeLocation: Option[NodeLocation]
+) extends Relation
     with LeafPlan {
   override def inputAttributes: Seq[Attribute] = Seq.empty
   override def outputAttributes: Seq[Attribute] = {
@@ -33,9 +42,8 @@ case class TableScan(table: Catalog.Table, columns: Seq[Catalog.TableColumn], no
       ResolvedAttribute(
         col.name,
         col.dataType,
-        None,
-        Some(table),
-        Some(col),
+        None, // This must be None first
+        Some(SourceColumn(table, col)),
         None // ResolvedAttribute always has no NodeLocation
       )
     }
@@ -51,53 +59,40 @@ case class TableScan(table: Catalog.Table, columns: Seq[Catalog.TableColumn], no
   override lazy val resolved = true
 }
 
-case class Alias(name: String, resolvedAttribute: ResolvedAttribute)
+case class SourceColumn(table: Catalog.Table, column: Catalog.TableColumn) {
+  def fullName: String = s"${table.name}.${column.name}"
+}
 
 case class ResolvedAttribute(
     name: String,
-    dataType: DataType,
+    override val dataType: DataType,
+    // user-given qualifier
     qualifier: Option[String],
-    sourceTable: Option[Catalog.Table],
-    sourceColumn: Option[Catalog.TableColumn],
+    // If this attribute directly refers to a table column, its source column will be set.
+    sourceColumn: Option[SourceColumn],
     nodeLocation: Option[NodeLocation]
-) extends Attribute {
-  require(sourceTable.nonEmpty == sourceColumn.nonEmpty, "sourceTable and sourceColumn must be set together")
+) extends Attribute
+    with LogSupport {
 
-  def withAlias(newName: String): ResolvedAttribute = {
-    this.copy(name = newName)
+  override lazy val resolved   = true
+  override def sqlExpr: String = s"${prefix}${name}"
+
+  override def withQualifier(newQualifier: Option[String]): Attribute = {
+    this.copy(qualifier = newQualifier)
   }
-
-  def relationName: Option[String] = qualifier.orElse(sourceTable.map(_.name))
-
-  /**
-    * Returns true if this resolved attribute matches with a given table name and colum name
-    */
-  def matchesWith(tableName: String, columnName: String): Boolean = {
-    relationName match {
-      case Some(tbl) =>
-        tbl == tableName && columnName == name
-      case None =>
-        columnName == name
-    }
-  }
+  override def inputColumns: Seq[Attribute] = Seq(this)
 
   override def toString = {
-    (qualifier, sourceTable, sourceColumn) match {
-      case (Some(q), Some(t), Some(c)) =>
-        s"${q}.${name}:${dataType} <- ${t.name}.${c.name}"
-      case (None, Some(t), Some(c)) if c.name == name =>
-        s"${t.name}.${name}:${dataType}"
-      case (None, Some(t), Some(c)) =>
-        s"${name}:${dataType} <- ${t.name}.${c.name}"
-      case _ =>
-        s"${name}:${dataType}"
+    sourceColumn match {
+      case Some(c) =>
+        s"*${prefix}${typeDescription} <- ${c.fullName}"
+      case None =>
+        s"*${prefix}${typeDescription}"
     }
-    // s"${sourceTable.map(t => s"${t.name}.${name}").getOrElse(name)}:${dataType}"
   }
-  override lazy val resolved = true
 
-  override def withQualifier(newQualifier: String): Attribute = {
-    this.copy(qualifier = Some(newQualifier))
+  override def sourceColumns: Seq[SourceColumn] = {
+    sourceColumn.toSeq
   }
 }
 

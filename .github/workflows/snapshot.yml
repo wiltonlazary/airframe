@@ -26,6 +26,19 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '11'
+      - name: Get Airframe version
+        run: echo "AIRFRAME_VERSION=$(./scripts/dynver.sh)" >> $GITHUB_ENV
+      - name: Check Airframe version
+        run: echo ${AIRFRAME_VERSION}
+      - name: Post version number to Slack
+        id: slack
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          # wvlet dev-snapshot channel
+          channel-id: 'C04CC79BZ7A'
+          slack-message: "Publishing a snapshot version of airframe: `${{ env.AIRFRAME_VERSION }}`"
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
       - name: Publish snapshots
         env:
           SONATYPE_USERNAME: '${{ secrets.SONATYPE_USER }}'
@@ -39,3 +52,13 @@ jobs:
         run: |
           ../sbt publishSnapshots
         working-directory: ./airspec
+      - name: Notify the completion to Slack
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          # wvlet dev-snapshot channel
+          channel-id: 'C04CC79BZ7A'
+          # Update the thread
+          update-ts: ${{ steps.slack.outputs.ts }}
+          slack-message: "[done] Published a snapshot version of airframe: `${{ env.AIRFRAME_VERSION }}`"
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

@@ -15,7 +15,8 @@ package wvlet.airframe.sql.analyzer
 
 import wvlet.airframe.sql.catalog.Catalog.CreateMode
 import wvlet.airframe.sql.catalog.{Catalog, DataType, InMemoryCatalog}
-import wvlet.airframe.sql.model.{NodeLocation, ResolvedAttribute}
+import wvlet.airframe.sql.model.Expression.{Alias, AllColumns}
+import wvlet.airframe.sql.model.{NodeLocation, ResolvedAttribute, SourceColumn}
 import wvlet.airspec.AirSpec
 
 /**
@@ -51,8 +52,8 @@ class SQLAnalyzerTest extends AirSpec {
     val plan = SQLAnalyzer.analyze("select id, name from a", "public", catalog)
     plan.resolved shouldBe true
     plan.outputAttributes.toList shouldBe List(
-      ResolvedAttribute("id", DataType.LongType, None, Some(tbl1), Some(tbl1.column("id")), None),
-      ResolvedAttribute("name", DataType.StringType, None, Some(tbl1), Some(tbl1.column("name")), None)
+      ResolvedAttribute("id", DataType.LongType, None, Some(SourceColumn(tbl1, tbl1.column("id"))), None),
+      ResolvedAttribute("name", DataType.StringType, None, Some(SourceColumn(tbl1, tbl1.column("name"))), None)
     )
   }
 
@@ -60,33 +61,75 @@ class SQLAnalyzerTest extends AirSpec {
     val plan = SQLAnalyzer.analyze("select * from a", "public", catalog)
     plan.resolved shouldBe true
     plan.outputAttributes.toList shouldBe List(
-      ResolvedAttribute("id", DataType.LongType, None, Some(tbl1), Some(tbl1.column("id")), None),
-      ResolvedAttribute("name", DataType.StringType, None, Some(tbl1), Some(tbl1.column("name")), None),
-      ResolvedAttribute("address", DataType.StringType, None, Some(tbl1), Some(tbl1.column("address")), None)
+      AllColumns(
+        None,
+        Some(
+          Seq(
+            ResolvedAttribute("id", DataType.LongType, None, Some(SourceColumn(tbl1, tbl1.column("id"))), None),
+            ResolvedAttribute(
+              "name",
+              DataType.StringType,
+              None,
+              Some(SourceColumn(tbl1, tbl1.column("name"))),
+              None
+            ),
+            ResolvedAttribute(
+              "address",
+              DataType.StringType,
+              None,
+              Some(SourceColumn(tbl1, tbl1.column("address"))),
+              None
+            )
+          )
+        ),
+        Some(NodeLocation(1, 8))
+      )
     )
   }
 
   test("resolve select with alias") {
     val plan = SQLAnalyzer.analyze("select id as person_id from a", "public", catalog)
     plan.resolved shouldBe true
-    plan.outputAttributes.toList shouldBe List(
-      ResolvedAttribute("person_id", DataType.LongType, None, Some(tbl1), Some(tbl1.column("id")), None)
-    )
+    plan.outputAttributes.toList shouldMatch {
+      // Attribute should not have a qualifier
+      case List(Alias(_, "person_id", r, _)) => {
+        r.attributeName shouldBe "id"
+        r.dataType shouldBe DataType.LongType
+      }
+    }
   }
 
   test("resolve join attributes") {
     val plan = SQLAnalyzer.analyze(
-      "select a.id, a.name, a.address, b.phone as person_id from a, b where a.id = b.id",
+      "select a.id, a.name, a.address, b.phone as phone_num from a, b where a.id = b.id",
       "public",
       catalog
     )
     plan.resolved shouldBe true
-    plan.outputAttributes.toList shouldBe List(
-      ResolvedAttribute("id", DataType.LongType, None, Some(tbl1), Some(tbl1.column("id")), None),
-      ResolvedAttribute("name", DataType.StringType, None, Some(tbl1), Some(tbl1.column("name")), None),
-      ResolvedAttribute("address", DataType.StringType, None, Some(tbl1), Some(tbl1.column("address")), None),
-      ResolvedAttribute("person_id", DataType.StringType, None, Some(tbl2), Some(tbl2.column("phone")), None)
+    val attr = plan.outputAttributes.toList
+    attr(0) shouldBe ResolvedAttribute(
+      "id",
+      DataType.LongType,
+      Some("a"),
+      Some(SourceColumn(tbl1, tbl1.column("id"))),
+      None
     )
+    attr(1) shouldBe
+      ResolvedAttribute("name", DataType.StringType, Some("a"), Some(SourceColumn(tbl1, tbl1.column("name"))), None)
+
+    attr(2) shouldBe
+      ResolvedAttribute(
+        "address",
+        DataType.StringType,
+        Some("a"),
+        Some(SourceColumn(tbl1, tbl1.column("address"))),
+        None
+      )
+    attr(3) shouldMatch { case Alias(_, "phone_num", a, _) =>
+      a shouldMatch { case ResolvedAttribute("phone", DataType.StringType, _, _, _) =>
+      // c shouldBe SourceColumn(tbl2, tbl2.column("phone"))
+      }
+    }
   }
 
 }

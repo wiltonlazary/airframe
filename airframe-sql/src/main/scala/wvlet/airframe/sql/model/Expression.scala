@@ -14,6 +14,11 @@
 
 package wvlet.airframe.sql.model
 
+import wvlet.airframe.sql.catalog.DataType
+import wvlet.airframe.sql.catalog.DataType._
+import wvlet.airframe.sql.model.Expression.{AllColumns, MultiSourceColumn, SingleColumn}
+import wvlet.log.LogSupport
+
 import java.util.Locale
 
 /**
@@ -21,8 +26,39 @@ import java.util.Locale
 sealed trait Expression extends TreeNode[Expression] with Product {
   def sqlExpr: String = toString()
 
-  def transformExpression(rule: PartialFunction[Expression, Expression]): this.type = {
-    def recursiveTransform(arg: Any): AnyRef =
+  /**
+    * * Returns "(name):(type)" of this attribute
+    */
+  def typeDescription: String = {
+    dataType match {
+      case e: EmbeddedRecordType =>
+        e.typeDescription
+      case _ =>
+        s"${attributeName}:${dataTypeName}"
+    }
+  }
+
+  /**
+    * Column name without qualifier
+    * @return
+    */
+  def attributeName: String = "?"
+  def dataTypeName: String  = dataType.typeDescription
+  def dataType: DataType    = DataType.UnknownType
+
+  private def createInstance(args: Iterator[AnyRef]): Expression = {
+    // TODO Build this LogicalPlan using Surface
+    val primaryConstructor = this.getClass.getDeclaredConstructors()(0)
+    primaryConstructor.newInstance(args.toArray[AnyRef]: _*).asInstanceOf[Expression]
+  }
+
+  /**
+    * Recursively transform the expression in breadth-first order
+    * @param rule
+    * @return
+    */
+  def transformExpression(rule: PartialFunction[Expression, Expression]): Expression = {
+    def recursiveTransform(arg: Any): AnyRef = {
       arg match {
         case e: Expression  => e.transformExpression(rule)
         case l: LogicalPlan => l.transformExpressions(rule)
@@ -31,20 +67,48 @@ sealed trait Expression extends TreeNode[Expression] with Product {
         case other: AnyRef  => other
         case null           => null
       }
+    }
 
+    // First apply the rule to itself
+    val newExpr: Expression = rule
+      .applyOrElse(this, identity[Expression])
+
+    // Next, apply the rule to child nodes
+    if (newExpr.productArity == 0) {
+      newExpr
+    } else {
+      val newArgs = newExpr.productIterator.map(recursiveTransform)
+      newExpr.createInstance(newArgs)
+    }
+  }
+
+  /**
+    * Recursively transform the expression in depth-first order
+    * @param rule
+    * @return
+    */
+  def transformUpExpression(rule: PartialFunction[Expression, Expression]): Expression = {
+    def iter(arg: Any): AnyRef =
+      arg match {
+        case e: Expression  => e.transformUpExpression(rule)
+        case l: LogicalPlan => l.transformUpExpressions(rule)
+        case Some(x)        => Some(iter(x))
+        case s: Seq[_]      => s.map(iter _)
+        case other: AnyRef  => other
+        case null           => null
+      }
+
+    // Apply the rule first to child nodes
     val newExpr = if (productArity == 0) {
       this
     } else {
-      val newArgs = productIterator.map(recursiveTransform).toArray[AnyRef]
-
-      // TODO Build this LogicalPlan using Surface
-      val primaryConstructor = this.getClass.getDeclaredConstructors()(0)
-      primaryConstructor.newInstance(newArgs: _*).asInstanceOf[this.type]
+      val newArgs = productIterator.map(iter)
+      createInstance(newArgs)
     }
 
-    // Apply the rule to itself
+    // Finally, apply the rule to itself
     rule
-      .applyOrElse(newExpr, { (x: Expression) => x }).asInstanceOf[this.type]
+      .applyOrElse(newExpr, identity[Expression])
   }
 
   def collectSubExpressions: List[Expression] = {
@@ -75,7 +139,8 @@ sealed trait Expression extends TreeNode[Expression] with Product {
     if (rule.isDefinedAt(this)) {
       rule.apply(this)
     }
-    productIterator.foreach(recursiveTraverse)
+    // Unlike transform, this will traverse the selected children by the Expression
+    children.foreach(recursiveTraverse)
   }
 
   def collectExpressions(cond: PartialFunction[Expression, Boolean]): List[Expression] = {
@@ -110,17 +175,158 @@ trait BinaryExpression extends Expression {
 }
 
 /**
+  * Used for matching column name with Attribute
+  * @param database
+  * @param table
+  * @param columnName
+  */
+case class ColumnPath(database: Option[String], table: Option[String], columnName: String)
+
+object ColumnPath {
+  def fromQName(contextDatabase: String, fullName: String): Option[ColumnPath] = {
+    // TODO Should we handle quotation in the name or just reject such strings?
+    fullName.split("\\.").toList match {
+      case List(db, t, c) if db == contextDatabase =>
+        Some(ColumnPath(Some(db), Some(t), c))
+      case List(t, c) =>
+        Some(ColumnPath(None, Some(t), c))
+      case List(c) =>
+        Some(ColumnPath(None, None, c))
+      case _ =>
+        None
+    }
+  }
+}
+
+/**
   * Attribute is used for column names of relational table inputs and outputs
   */
-trait Attribute extends LeafExpression {
+trait Attribute extends LeafExpression with LogSupport {
+  override def attributeName: String = name
   def name: String
+  def fullName: String = {
+    s"${prefix}${name}"
+  }
+  def prefix: String = qualifier.map(q => s"${q}.").getOrElse("")
 
   /**
-    * Set an alias for the table or subquery.
-    * @param newQualifier
+    * Returns the unmodified source columns referenced by this Attribute
+    */
+  def sourceColumns: Seq[SourceColumn]
+
+  // (database name)?.(table name) given in the original SQL
+  def qualifier: Option[String]
+  def withQualifier(newQualifier: String): Attribute = withQualifier(Some(newQualifier))
+  def withQualifier(newQualifier: Option[String]): Attribute
+  def setQualifierIfEmpty(newQualifier: Option[String]): Attribute = {
+    qualifier match {
+      case Some(q) => this
+      case None    => this.withQualifier(newQualifier)
+    }
+  }
+
+  import Expression.Alias
+  def alias: Option[String] = {
+    this match {
+      case a: Expression.Alias => Some(a.name)
+      case _                   => None
+    }
+  }
+  def withAlias(newAlias: String): Attribute = withAlias(Some(newAlias))
+  def withAlias(newAlias: Option[String]): Attribute = {
+    newAlias match {
+      case None => this
+      case Some(alias) =>
+        this match {
+          case a: Alias =>
+            if (name != alias) a.copy(name = alias) else a
+          case other if other.name == alias =>
+            // No need to have alias
+            other
+          case other =>
+            Alias(qualifier, alias, other, None)
+        }
+    }
+  }
+
+  /**
+    * Sub Attributes used to generate this Attribute
     * @return
     */
-  def withQualifier(newQualifier: String): Attribute
+  def inputColumns: Seq[Attribute]
+
+  /**
+    * Return true if this Attribute matches with a given column path
+    * @param columnPath
+    * @return
+    */
+  def matchesWith(columnPath: ColumnPath): Boolean = {
+    def matchesWith(columnName: String): Boolean = {
+      this match {
+        case a: AllColumns =>
+          a.inputColumns.exists(_.name == columnName)
+        case a: Attribute if a.name == columnName =>
+          true
+        case _ =>
+          false
+      }
+    }
+
+    columnPath.table match {
+      // TODO handle (catalog).(database).(table) names in the qualifier
+      case Some(tableName) =>
+        qualifier.exists(_ == tableName) && matchesWith(columnPath.columnName)
+      case None =>
+        matchesWith(columnPath.columnName)
+    }
+  }
+
+  /**
+    * If a given column name matches with this Attribute, return this. If there are multiple candidate attributes (e.g.,
+    * via Join, Union), return MultiSourceAttribute.
+    */
+  def matched(columnPath: ColumnPath): Option[Attribute] = {
+    def findMatched(columnName: String): Seq[Attribute] = {
+      this match {
+        case a: AllColumns =>
+          a.inputColumns.filter(_.name == columnName)
+        case a: Attribute if a.name == columnName =>
+          Seq(a)
+        case _ =>
+          Seq.empty
+      }
+    }
+
+    val result: Seq[Attribute] = columnPath.table match {
+      // TODO handle (catalog).(database).(table) names in the qualifier
+      case Some(tableName) =>
+        if (qualifier.exists(_ == tableName)) {
+          findMatched(columnPath.columnName).map(_.withQualifier(qualifier))
+        } else {
+          this match {
+            case r: ResolvedAttribute if r.sourceColumn.nonEmpty && r.sourceColumn.get.table.name == tableName =>
+              findMatched(columnPath.columnName)
+            case _ =>
+              Nil
+          }
+        }
+      case None =>
+        findMatched(columnPath.columnName)
+    }
+
+    if (result.size > 1) {
+      val q = if (result.forall(_.qualifier == result.head.qualifier)) {
+        // Preserve the qualifier
+        result.head.qualifier
+      } else {
+        qualifier
+      }
+      Some(MultiSourceColumn(result, qualifier = q, None))
+    } else {
+      result.headOption
+    }
+  }
+
 }
 
 object Expression {
@@ -160,16 +366,33 @@ object Expression {
     }
   }
 
-  case class UnresolvedAttribute(name: String, nodeLocation: Option[NodeLocation]) extends Attribute {
-    override def toString        = s"UnresolvedAttribute(${name})"
-    override def sqlExpr: String = name
-    override lazy val resolved   = false
+  case class UnresolvedAttribute(
+      override val qualifier: Option[String],
+      name: String,
+      nodeLocation: Option[NodeLocation]
+  ) extends Attribute {
+    override def toString: String = s"UnresolvedAttribute(${fullName})"
+    override def sqlExpr: String  = name
+    override lazy val resolved    = false
+    override def withQualifier(newQualifier: Option[String]): UnresolvedAttribute = {
+      this.copy(qualifier = newQualifier)
+    }
+    override def inputColumns: Seq[Attribute]     = Seq.empty
+    override def sourceColumns: Seq[SourceColumn] = Seq.empty
 
-    override def withQualifier(newQualifier: String): Attribute = this
   }
 
   sealed trait Identifier extends LeafExpression {
     def value: String
+    override def attributeName: String  = value
+    override lazy val resolved: Boolean = false
+    def toResolved: ResolvedIdentifier  = ResolvedIdentifier(this)
+  }
+  case class ResolvedIdentifier(id: Identifier) extends Identifier {
+    override def value: String                      = id.value
+    override def nodeLocation: Option[NodeLocation] = id.nodeLocation
+    override def sqlExpr: String                    = id.sqlExpr
+    override lazy val resolved: Boolean             = true
   }
   case class DigitId(value: String, nodeLocation: Option[NodeLocation]) extends Identifier {
     override def sqlExpr: String  = value
@@ -193,6 +416,11 @@ object Expression {
   case class JoinUsing(columns: Seq[Identifier], nodeLocation: Option[NodeLocation]) extends JoinCriteria {
     override def children: Seq[Expression] = columns
     override def toString: String          = s"JoinUsing(${columns.mkString(",")})"
+  }
+  case class ResolvedJoinUsing(keys: Seq[MultiSourceColumn], nodeLocation: Option[NodeLocation]) extends JoinCriteria {
+    override def children: Seq[Expression] = keys
+    override def toString: String          = s"ResolvedJoinUsing(${keys.mkString(",")})"
+    override lazy val resolved: Boolean    = true
   }
   case class JoinOn(expr: Expression, nodeLocation: Option[NodeLocation]) extends JoinCriteria with UnaryExpression {
     override def child: Expression = expr
@@ -227,28 +455,166 @@ object Expression {
     override def children: Seq[Expression] = keys
   }
 
-  case class AllColumns(qualifier: Option[QName], nodeLocation: Option[NodeLocation]) extends Attribute {
-    override def name: String              = qualifier.map(x => s"${x}.*").getOrElse("*")
-    override def children: Seq[Expression] = qualifier.toSeq
-    override def toString                  = s"AllColumns(${name})"
-    override lazy val resolved             = false
+  case class AllColumns(
+      override val qualifier: Option[String],
+      columns: Option[Seq[Attribute]],
+      nodeLocation: Option[NodeLocation]
+  ) extends Attribute
+      with LogSupport {
+    override def name: String = "*"
 
-    override def withQualifier(newQualifier: String): Attribute = {
-      this.copy(qualifier = Some(QName(newQualifier, nodeLocation)))
+    override def children: Seq[Expression] = {
+      // AllColumns is a reference to the input attributes.
+      // Return empty so as not to traverse children from here.
+      Seq.empty
+    }
+    override def inputColumns: Seq[Attribute] = {
+      columns match {
+        case Some(columns) =>
+          columns.flatMap {
+            case a: AllColumns => a.inputColumns
+            case a             => Seq(a)
+          }
+        case None => Nil
+      }
+    }
+
+    override def dataType: DataType = {
+      columns
+        .map(cols => EmbeddedRecordType(cols.map(x => NamedType(x.name, x.dataType))))
+        .getOrElse(DataType.UnknownType)
+    }
+
+    override def withQualifier(newQualifier: Option[String]): Attribute = {
+      this.copy(qualifier = newQualifier)
+    }
+
+    override def toString = {
+      columns match {
+        case Some(attrs) if attrs.nonEmpty =>
+          val inputs = attrs
+            .map(a => s"${a.fullName}:${a.dataTypeName}").mkString(", ")
+          s"AllColumns(${inputs})"
+        case _ =>
+          s"AllColumns(${fullName})"
+      }
+    }
+
+    override def sourceColumns: Seq[SourceColumn] = {
+      columns.map(_.flatMap(_.sourceColumns)).getOrElse(Seq.empty)
+    }
+
+    override lazy val resolved = columns.isDefined
+  }
+
+  case class Alias(
+      qualifier: Option[String],
+      name: String,
+      expr: Expression,
+      nodeLocation: Option[NodeLocation]
+  ) extends Attribute {
+    override def inputColumns: Seq[Attribute] = Seq(this)
+    override def children: Seq[Expression]    = Seq(expr)
+
+    override def withQualifier(newQualifier: Option[String]): Attribute = {
+      this.copy(qualifier = newQualifier)
+    }
+
+    override def toString: String = {
+      s"<${fullName}> := ${expr}"
+    }
+    override def dataType: DataType = expr.dataType
+
+    override def sqlExpr: String = {
+      s"${expr.sqlExpr} AS ${fullName}"
+    }
+
+    override def sourceColumns: Seq[SourceColumn] = {
+      expr match {
+        case a: Attribute => a.sourceColumns
+        case _            => Seq.empty
+      }
     }
   }
+
+  /**
+    * An attribute that produces a single column value with a given expression.
+    *
+    * @param expr
+    * @param alias
+    * @param qualifier
+    * @param nodeLocation
+    */
   case class SingleColumn(
       expr: Expression,
-      alias: Option[Expression],
       qualifier: Option[String] = None,
       nodeLocation: Option[NodeLocation]
   ) extends Attribute {
-    override def name: String              = alias.getOrElse(expr).toString
-    override def children: Seq[Expression] = Seq(expr) ++ alias.toSeq
-    override def toString = s"SingleColumn(${alias.map(a => s"${expr} as ${a}").getOrElse(s"${expr}")})"
+    override def name: String       = expr.attributeName
+    override def dataType: DataType = expr.dataType
 
-    override def withQualifier(newQualifier: String): Attribute = {
-      this.copy(qualifier = Some(newQualifier))
+    override def inputColumns: Seq[Attribute] = Seq(this)
+    override def children: Seq[Expression]    = Seq(expr)
+    override def toString                     = s"${fullName}:${dataTypeName} := ${expr}"
+
+    override def sqlExpr: String = expr.sqlExpr
+    override def withQualifier(newQualifier: Option[String]): Attribute = {
+      this.copy(qualifier = newQualifier)
+    }
+
+    override def sourceColumns: Seq[SourceColumn] = {
+      expr match {
+        case a: Attribute => a.sourceColumns
+        case _            => Seq.empty
+      }
+    }
+  }
+
+  /**
+    * A single column merged from multiple input expressions (e.g., union, join)
+    * @param inputs
+    * @param alias
+    * @param nodeLocation
+    */
+  case class MultiSourceColumn(
+      inputs: Seq[Expression],
+      qualifier: Option[String],
+      nodeLocation: Option[NodeLocation]
+  ) extends Attribute {
+    require(inputs.nonEmpty, s"The inputs of MultiSourceColumn should not be empty: ${this}")
+
+    override def toString: String = s"${fullName}:${dataTypeName} := {${inputs.mkString(", ")}}"
+
+    override def inputColumns: Seq[Attribute] = {
+      inputs.map {
+        case a: Attribute => a
+        case e: Expression =>
+          SingleColumn(e, qualifier, e.nodeLocation)
+      }
+    }
+    override def children: Seq[Expression] = {
+      // MultiSourceColumn is a reference to the multiple columns. Do not traverse here
+      Seq.empty
+    }
+
+    override def sqlExpr: String = fullName
+
+    override def name: String = {
+      inputs.head.attributeName
+    }
+    override def dataType: DataType = {
+      inputs.head.dataType
+    }
+
+    override def withQualifier(newQualifier: Option[String]): Attribute = {
+      this.copy(qualifier = newQualifier)
+    }
+
+    override def sourceColumns: Seq[SourceColumn] = {
+      inputs.flatMap {
+        case a: Attribute => a.sourceColumns
+        case _            => Seq.empty
+      }
     }
   }
 
@@ -348,6 +714,15 @@ object Expression {
       window: Option[Window],
       nodeLocation: Option[NodeLocation]
   ) extends Expression {
+    override def dataType: DataType = {
+      if (functionName == "count") {
+        DataType.LongType
+      } else {
+        // TODO: Resolve the function return type using a function catalog
+        DataType.UnknownType
+      }
+    }
+
     override def children: Seq[Expression] = args ++ filter.toSeq ++ window.toSeq
     def functionName: String               = name.toString.toLowerCase(Locale.US)
     override def toString = s"FunctionCall(${name}, ${args.mkString(", ")}, distinct:${isDistinct}, window:${window})"
@@ -409,11 +784,11 @@ object Expression {
     override def children: Seq[Expression] = Seq(a) ++ list
   }
   case class InSubQuery(a: Expression, in: Relation, nodeLocation: Option[NodeLocation]) extends ConditionalExpression {
-    override def children: Seq[Expression] = Seq(a) ++ in.expressions
+    override def children: Seq[Expression] = Seq(a) ++ in.childExpressions
   }
   case class NotInSubQuery(a: Expression, in: Relation, nodeLocation: Option[NodeLocation])
       extends ConditionalExpression {
-    override def children: Seq[Expression] = Seq(a) ++ in.expressions
+    override def children: Seq[Expression] = Seq(a) ++ in.childExpressions
   }
   case class Like(left: Expression, right: Expression, nodeLocation: Option[NodeLocation])
       extends ConditionalExpression
@@ -472,7 +847,16 @@ object Expression {
       right: Expression,
       nodeLocation: Option[NodeLocation]
   ) extends ArithmeticExpression
-      with BinaryExpression
+      with BinaryExpression {
+    override def dataType: DataType = {
+      if (left.dataType == right.dataType) {
+        left.dataType
+      } else {
+        // TODO type escalation e.g., (Double) op (Long) -> (Double)
+        DataType.UnknownType
+      }
+    }
+  }
   case class ArithmeticUnaryExpr(sign: Sign, child: Expression, nodeLocation: Option[NodeLocation])
       extends ArithmeticExpression
       with UnaryExpression
@@ -498,11 +882,13 @@ object Expression {
     def stringValue: String
   }
   case class NullLiteral(nodeLocation: Option[NodeLocation]) extends Literal with LeafExpression {
+    override def dataType: DataType  = DataType.NullType
     override def stringValue: String = "null"
     override def sqlExpr: String     = "NULL"
     override def toString: String    = "Literal(NULL)"
   }
   sealed trait BooleanLiteral extends Literal {
+    override def dataType: DataType = DataType.BooleanType
     def booleanValue: Boolean
   }
   case class TrueLiteral(nodeLocation: Option[NodeLocation]) extends BooleanLiteral with LeafExpression {
@@ -518,39 +904,46 @@ object Expression {
     override def booleanValue: Boolean = false
   }
   case class StringLiteral(value: String, nodeLocation: Option[NodeLocation]) extends Literal with LeafExpression {
+    override def dataType: DataType  = DataType.StringType
     override def stringValue: String = value
     override def sqlExpr: String     = s"'${value}'"
-    override def toString            = s"Literal('${value}')"
+    override def toString            = s"StringLiteral('${value}')"
   }
   case class TimeLiteral(value: String, nodeLocation: Option[NodeLocation]) extends Literal with LeafExpression {
+    override def dataType: DataType  = DataType.TimestampType(TimestampField.TIME, false)
     override def stringValue: String = value
     override def sqlExpr             = s"TIME '${value}'"
     override def toString            = s"Literal(TIME '${value}')"
   }
   case class TimestampLiteral(value: String, nodeLocation: Option[NodeLocation]) extends Literal with LeafExpression {
+    override def dataType: DataType  = DataType.TimestampType(TimestampField.TIMESTAMP, false)
     override def stringValue: String = value
     override def sqlExpr             = s"TIMESTAMP '${value}'"
     override def toString            = s"Literal(TIMESTAMP '${value}')"
   }
   case class DecimalLiteral(value: String, nodeLocation: Option[NodeLocation]) extends Literal with LeafExpression {
+    override def dataType: DataType  = DataType.DecimalType(TypeVariable("precision"), TypeVariable("scale"))
     override def stringValue: String = value
     override def sqlExpr             = s"DECIMAL '${value}'"
     override def toString            = s"Literal(DECIMAL '${value}')"
   }
   case class CharLiteral(value: String, nodeLocation: Option[NodeLocation]) extends Literal with LeafExpression {
+    override def dataType: DataType  = DataType.CharType(None)
     override def stringValue: String = value
     override def sqlExpr             = s"CHAR '${value}'"
     override def toString            = s"Literal(CHAR '${value}')"
   }
   case class DoubleLiteral(value: Double, nodeLocation: Option[NodeLocation]) extends Literal with LeafExpression {
+    override def dataType: DataType  = DataType.DoubleType
     override def stringValue: String = value.toString
     override def sqlExpr             = value.toString
-    override def toString            = s"Literal(${value.toString})"
+    override def toString            = s"DoubleLiteral(${value.toString})"
   }
   case class LongLiteral(value: Long, nodeLocation: Option[NodeLocation]) extends Literal with LeafExpression {
+    override def dataType: DataType  = DataType.LongType
     override def stringValue: String = value.toString
     override def sqlExpr             = value.toString
-    override def toString            = s"Literal(${value.toString})"
+    override def toString            = s"LongLiteral(${value.toString})"
   }
   case class IntervalLiteral(
       value: String,
@@ -594,10 +987,24 @@ object Expression {
 
   // Value constructor
   case class ArrayConstructor(values: Seq[Expression], nodeLocation: Option[NodeLocation]) extends Expression {
+    def elementType: DataType = {
+      val elemTypes = values.map(_.dataType).distinct
+      if (elemTypes.size == 1) {
+        elemTypes.head
+      } else {
+        AnyType
+      }
+    }
+    override def dataType: DataType = {
+      ArrayType(elementType)
+    }
     override def children: Seq[Expression] = values
   }
 
   case class RowConstructor(values: Seq[Expression], nodeLocation: Option[NodeLocation]) extends Expression {
+    override def dataType: DataType = {
+      EmbeddedRecordType(values.map(_.dataType))
+    }
     override def children: Seq[Expression] = values
   }
 
@@ -616,7 +1023,7 @@ object Expression {
   // 1-origin parameter
   case class Parameter(index: Int, nodeLocation: Option[NodeLocation]) extends LeafExpression
   case class SubQueryExpression(query: Relation, nodeLocation: Option[NodeLocation]) extends Expression {
-    override def children: Seq[Expression] = query.expressions
+    override def children: Seq[Expression] = query.childExpressions
   }
 
   case class Cast(expr: Expression, tpe: String, tryCast: Boolean = false, nodeLocation: Option[NodeLocation])

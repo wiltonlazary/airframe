@@ -12,12 +12,15 @@
  * limitations under the License.
  */
 package wvlet.airframe.sql.model
-import wvlet.airframe.sql.analyzer.QuerySignatureConfig
+import wvlet.airframe.sql.analyzer.{QuerySignatureConfig}
+import wvlet.log.LogSupport
+
+import java.util.UUID
 
 trait LogicalPlan extends TreeNode[LogicalPlan] with Product with SQLSig {
   def modelName: String = {
     val n = this.getClass.getSimpleName
-    if (n.endsWith("$")) n.substring(0, n.length - 1) else n
+    n.stripSuffix("$")
   }
 
   def pp: String = {
@@ -32,14 +35,16 @@ trait LogicalPlan extends TreeNode[LogicalPlan] with Product with SQLSig {
   def children: Seq[LogicalPlan]
 
   /**
-    * Expressions associated to this LogicalPlan node
+    * Return child expressions associated to this LogicalPlan node
     *
     * @return
+    *   child expressions of this node
     */
-  def expressions: Seq[Expression] = {
+  def childExpressions: Seq[Expression] = {
     def collectExpression(x: Any): Seq[Expression] = {
       x match {
         case e: Expression  => e :: Nil
+        case p: LogicalPlan => Nil
         case Some(x)        => collectExpression(x)
         case s: Iterable[_] => s.flatMap(collectExpression _).toSeq
         case other          => Nil
@@ -53,11 +58,160 @@ trait LogicalPlan extends TreeNode[LogicalPlan] with Product with SQLSig {
 
   def mapChildren(f: LogicalPlan => LogicalPlan): LogicalPlan = {
     var changed = false
-    def recursiveTransform(arg: Any): AnyRef =
+    def transformElement(arg: Any): AnyRef =
       arg match {
         case e: Expression => e
         case l: LogicalPlan => {
           val newPlan = f(l)
+          if (!newPlan.eq(l)) {
+            changed = true
+          }
+          newPlan
+        }
+        case Some(x)       => Some(transformElement(x))
+        case s: Seq[_]     => s.map(transformElement _)
+        case other: AnyRef => other
+        case null          => null
+      }
+
+    val newArgs = productIterator.map(transformElement).toIndexedSeq
+    if (changed) {
+      copyInstance(newArgs)
+    } else {
+      this
+    }
+  }
+
+  private def recursiveTraverse[U](f: PartialFunction[LogicalPlan, U])(arg: Any): Unit = {
+    def loop(v: Any): Unit = {
+      v match {
+        case e: Expression =>
+        case l: LogicalPlan => {
+          if (f.isDefinedAt(l)) {
+            f.apply(l)
+          }
+          l.productIterator.foreach(x => loop(x))
+        }
+        case Some(x)       => Some(loop(x))
+        case s: Seq[_]     => s.map(x => loop(x))
+        case other: AnyRef =>
+        case null          =>
+      }
+    }
+    loop(arg)
+  }
+
+  /**
+    * Recursively traverse plan nodes and apply the given function to LogicalPlan nodes
+    *
+    * @param rule
+    */
+  def traverse[U](rule: PartialFunction[LogicalPlan, U]): Unit = {
+    recursiveTraverse(rule)(this)
+  }
+
+  /**
+    * Recursively traverse the child plan nodes and apply the given function to LogicalPlan nodes
+    *
+    * @param rule
+    */
+  def traverseChildren[U](rule: PartialFunction[LogicalPlan, U]): Unit = {
+    productIterator.foreach(child => recursiveTraverse(rule)(child))
+  }
+
+  private def recursiveTraverseOnce[U](f: PartialFunction[LogicalPlan, U])(arg: Any): Unit = {
+    def loop(v: Any): Unit = {
+      v match {
+        case e: Expression =>
+        case l: LogicalPlan => {
+          if (f.isDefinedAt(l)) {
+            f.apply(l)
+          } else {
+            l.productIterator.foreach(x => loop(x))
+          }
+        }
+        case Some(x)       => Some(loop(x))
+        case s: Seq[_]     => s.map(x => loop(x))
+        case other: AnyRef =>
+        case null          =>
+      }
+    }
+    loop(arg)
+  }
+
+  /**
+    * Recursively traverse the plan nodes until the rule matches.
+    *
+    * @param rule
+    * @tparam U
+    */
+  def traverseOnce[U](rule: PartialFunction[LogicalPlan, U]): Unit = {
+    recursiveTraverseOnce(rule)(this)
+  }
+
+  /**
+    * Recursively traverse the child plan nodes until the rule matches.
+    * @param rule
+    * @tparam U
+    */
+  def traverseChildrenOnce[U](rule: PartialFunction[LogicalPlan, U]): Unit = {
+    productIterator.foreach(child => recursiveTraverseOnce(rule)(child))
+  }
+
+  /**
+    * Iterate through LogicalPlans and apply matching rules for transformation. The transformation will be applied to
+    * the current node as well.
+    *
+    * @param rule
+    * @return
+    */
+  def transform(rule: PartialFunction[LogicalPlan, LogicalPlan]): LogicalPlan = {
+    val newNode: LogicalPlan = rule.applyOrElse(this, identity[LogicalPlan])
+    if (newNode.eq(this)) {
+      mapChildren(_.transform(rule))
+    } else {
+      newNode.mapChildren(_.transform(rule))
+    }
+  }
+
+  def transformUp(rule: PartialFunction[LogicalPlan, LogicalPlan]): LogicalPlan = {
+    val newNode = this.mapChildren(_.transformUp(rule))
+    rule.applyOrElse(newNode, identity[LogicalPlan])
+  }
+
+  /**
+    * Traverse the tree until finding the nodes matching the pattern. All nodes found from the root will be transformed,
+    * and no further recursive match will occur from the transformed nodes.
+    *
+    * If you want to continue the transformation for the child nodes, use [[transformChildren]] or
+    * [[transformChildrenOnce]] inside the rule.
+    * @param rule
+    * @return
+    */
+  def transformOnce(rule: PartialFunction[LogicalPlan, LogicalPlan]): LogicalPlan = {
+    val newNode: LogicalPlan = rule.applyOrElse(this, identity[LogicalPlan])
+    if (newNode.eq(this)) {
+      transformChildrenOnce(rule)
+    } else {
+      // The root node was transformed
+      newNode
+    }
+  }
+
+  /**
+    * Transform child node only once
+    *
+    * @param rule
+    * @return
+    */
+  def transformChildren(rule: PartialFunction[LogicalPlan, LogicalPlan]): LogicalPlan = {
+    var changed = false
+
+    def recursiveTransform(arg: Any): AnyRef =
+      arg match {
+        case e: Expression => e
+        case l: LogicalPlan => {
+          val newPlan = rule.applyOrElse(l, identity[LogicalPlan])
           if (!newPlan.eq(l)) {
             changed = true
           }
@@ -78,55 +232,141 @@ trait LogicalPlan extends TreeNode[LogicalPlan] with Product with SQLSig {
   }
 
   /**
-    * Recursively traverse plan nodes and apply the given function to LogicalPlan nodes
-    * @param f
-    */
-  def traverse[U](f: PartialFunction[LogicalPlan, U]): Unit = {
-    def recursiveTraverse(arg: Any): Unit =
-      arg match {
-        case e: Expression =>
-        case l: LogicalPlan => {
-          if (f.isDefinedAt(l)) {
-            f.apply(l)
-          }
-          l.productIterator.foreach(recursiveTraverse)
-        }
-        case Some(x)       => Some(recursiveTraverse(x))
-        case s: Seq[_]     => s.map(recursiveTraverse _)
-        case other: AnyRef =>
-        case null          =>
-      }
-
-    recursiveTraverse(this)
-  }
-
-  /**
-    * Iterate through LogicalPlans and apply matching rules for transformation
+    * Apply [[transformOnce]] for all child nodes.
+    *
     * @param rule
     * @return
     */
-  def transform(rule: PartialFunction[LogicalPlan, LogicalPlan]): LogicalPlan = {
-    val newNode: LogicalPlan = rule.applyOrElse(this, identity[LogicalPlan])
-    if (newNode.eq(this)) {
-      mapChildren(_.transform(rule))
+  def transformChildrenOnce(rule: PartialFunction[LogicalPlan, LogicalPlan]): LogicalPlan = {
+    var changed = false
+
+    def recursiveTransform(arg: Any): AnyRef =
+      arg match {
+        case e: Expression => e
+        case l: LogicalPlan => {
+          val newPlan = l.transformOnce(rule)
+          if (!newPlan.eq(l)) {
+            changed = true
+          }
+          newPlan
+        }
+        case Some(x)       => Some(recursiveTransform(x))
+        case s: Seq[_]     => s.map(recursiveTransform _)
+        case other: AnyRef => other
+        case null          => null
+      }
+
+    val newArgs = productIterator.map(recursiveTransform).toIndexedSeq
+    if (changed) {
+      copyInstance(newArgs)
     } else {
-      newNode.mapChildren(_.transform(rule))
+      this
     }
   }
 
+  /**
+    * Recursively transform all nested expressions
+    * @param rule
+    * @return
+    */
   def transformExpressions(rule: PartialFunction[Expression, Expression]): LogicalPlan = {
-    def recursiveTransform(arg: Any): AnyRef =
+    var changed = false
+    def loopOnlyPlan(arg: Any): AnyRef = {
       arg match {
-        case e: Expression  => e.transformExpression(rule)
-        case l: LogicalPlan => l.transformExpressions(rule)
-        case Some(x)        => Some(recursiveTransform(x))
-        case s: Seq[_]      => s.map(recursiveTransform _)
+        case e: Expression => e
+        case l: LogicalPlan =>
+          val newPlan = l.transformExpressions(rule)
+          if (l eq newPlan) {
+            l
+          } else {
+            changed = true
+            newPlan
+          }
+        case Some(x)       => Some(loopOnlyPlan(x))
+        case s: Seq[_]     => s.map(loopOnlyPlan _)
+        case other: AnyRef => other
+        case null          => null
+      }
+    }
+
+    // Transform child expressions first
+    val newPlan = transformChildExpressions(rule)
+    val newArgs = newPlan.productIterator.map(loopOnlyPlan).toSeq
+    if (changed) {
+      copyInstance(newArgs)
+    } else {
+      newPlan
+    }
+  }
+
+  /**
+    * Depth-first transformation of expression
+    *
+    * @param rule
+    * @return
+    */
+  def transformUpExpressions(rule: PartialFunction[Expression, Expression]): LogicalPlan = {
+    var changed = false
+    def iter(arg: Any): AnyRef =
+      arg match {
+        case e: Expression =>
+          val newExpr = e.transformUpExpression(rule)
+          if (e eq newExpr) {
+            e
+          } else {
+            changed = true
+            newExpr
+          }
+        case l: LogicalPlan =>
+          val newPlan = l.transformUpExpressions(rule)
+          if (l eq newPlan) l
+          else {
+            changed = true
+            newPlan
+          }
+        case Some(x)       => Some(iter(x))
+        case s: Seq[_]     => s.map(iter _)
+        case other: AnyRef => other
+        case null          => null
+      }
+
+    val newArgs = productIterator.map(iter).toIndexedSeq
+    if (changed) {
+      copyInstance(newArgs)
+    } else {
+      this
+    }
+  }
+
+  /**
+    * Transform only child expressions
+    * @param rule
+    * @return
+    */
+  def transformChildExpressions(rule: PartialFunction[Expression, Expression]): LogicalPlan = {
+    var changed = false
+    def iterOnce(arg: Any): AnyRef =
+      arg match {
+        case e: Expression =>
+          val newExpr = rule.applyOrElse(e, identity[Expression])
+          if (e eq newExpr) {
+            e
+          } else {
+            changed = true
+            newExpr
+          }
+        case l: LogicalPlan => l
+        case Some(x)        => Some(iterOnce(x))
+        case s: Seq[_]      => s.map(iterOnce _)
         case other: AnyRef  => other
         case null           => null
       }
 
-    val newArgs = productIterator.map(recursiveTransform).toIndexedSeq
-    copyInstance(newArgs)
+    val newArgs = productIterator.map(iterOnce).toIndexedSeq
+    if (changed)
+      copyInstance(newArgs)
+    else
+      this
   }
 
   protected def copyInstance(newArgs: Seq[AnyRef]): this.type = {
@@ -191,8 +431,12 @@ trait LogicalPlan extends TreeNode[LogicalPlan] with Product with SQLSig {
   def outputAttributes: Seq[Attribute]
 
   // True if all input attributes are resolved.
-  lazy val resolved: Boolean    = expressions.forall(_.resolved) && resolvedChildren
+  lazy val resolved: Boolean    = childExpressions.forall(_.resolved) && resolvedChildren
   def resolvedChildren: Boolean = children.forall(_.resolved)
+
+  def unresolvedExpressions: Seq[Expression] = {
+    collectExpressions { case x: Expression => !x.resolved }
+  }
 }
 
 trait LeafPlan extends LogicalPlan {
@@ -225,8 +469,8 @@ object LogicalPlan {
 
   private def isSelectAll(selectItems: Seq[Attribute]): Boolean = {
     selectItems.exists {
-      case AllColumns(x, _) => true
-      case _                => false
+      case AllColumns(x, _, _) => true
+      case _                   => false
     }
   }
 
@@ -254,9 +498,21 @@ object LogicalPlan {
 
     override def inputAttributes: Seq[Attribute] = child.inputAttributes
     override def outputAttributes: Seq[Attribute] = {
-      child.outputAttributes.map { a =>
+      val attrs = child.outputAttributes.map { a =>
         a.withQualifier(alias.value)
       }
+      val result = columnNames match {
+        case Some(columnNames) =>
+          attrs.zip(columnNames).map { case (a, columnName) =>
+            a match {
+              case a: Attribute => a.withAlias(columnName)
+              case others       => others
+            }
+          }
+        case None =>
+          attrs
+      }
+      result
     }
   }
 
@@ -264,8 +520,18 @@ object LogicalPlan {
     override def sig(config: QuerySignatureConfig): String = {
       s"V[${rows.length}]"
     }
-    override def outputAttributes: Seq[Attribute] =
-      (0 until rows.size).map(x => UnresolvedAttribute(s"i${x}", None))
+    override def outputAttributes: Seq[Attribute] = {
+      val values = rows.map { row =>
+        row match {
+          case r: RowConstructor => r.values
+          case other             => Seq(other)
+        }
+      }
+      val columns = (0 until values.head.size).map { i =>
+        MultiSourceColumn(values.map(_(i)), None, None)
+      }
+      columns
+    }
   }
 
   case class TableRef(name: QName, nodeLocation: Option[NodeLocation]) extends Relation with LeafPlan {
@@ -284,7 +550,7 @@ object LogicalPlan {
     override def outputAttributes: Seq[Attribute]          = Nil
   }
 
-  // Deduplicate (duplicate elimination) the input releation
+  // Deduplicate (duplicate elimination) the input relation
   case class Distinct(child: Relation, nodeLocation: Option[NodeLocation]) extends UnaryRelation {
     override def sig(config: QuerySignatureConfig): String =
       s"E(${child.sig(config)})"
@@ -316,7 +582,7 @@ object LogicalPlan {
     override def outputAttributes: Seq[Attribute]   = Nil
   }
 
-// This node can be a pivot node for generating a SELECT statament
+// This node can be a pivot node for generating a SELECT statement
   sealed trait Selection extends UnaryRelation {
     def selectItems: Seq[Attribute]
   }
@@ -331,7 +597,6 @@ object LogicalPlan {
       s"P[${proj}](${child.sig(config)})"
     }
 
-    // TODO
     override def outputAttributes: Seq[Attribute] = {
       selectItems
     }
@@ -355,7 +620,9 @@ object LogicalPlan {
     override def toString =
       s"Aggregate[${groupingKeys.mkString(",")}](Select[${selectItems.mkString(", ")}(${child})"
 
-    override def outputAttributes: Seq[Attribute] = selectItems
+    override def outputAttributes: Seq[Attribute] = {
+      selectItems
+    }
   }
 
   case class Query(withQuery: With, body: Relation, nodeLocation: Option[NodeLocation]) extends Relation {
@@ -397,12 +664,12 @@ object LogicalPlan {
       columnNames match {
         case Some(aliases) =>
           query.outputAttributes.zip(aliases).map { case (in, alias) =>
+            // TODO No need to re-wrap by SingleColumn for ResolvedAttribute, SingleColumn and MultiColumn?
             SingleColumn(
               in,
-              Some(alias),
               None,
-              alias.nodeLocation // TODO Is alias.nodeLocation suitable as NodeLocation for this?
-            )
+              alias.nodeLocation
+            ).withAlias(alias.value)
           }
         case None =>
           query.outputAttributes
@@ -423,20 +690,27 @@ object LogicalPlan {
     override def sig(config: QuerySignatureConfig): String = {
       s"${joinType.symbol}(${left.sig(config)},${right.sig(config)})"
     }
-    override def inputAttributes: Seq[Attribute] =
+    override def inputAttributes: Seq[Attribute] = {
       left.outputAttributes ++ right.outputAttributes
+    }
     override def outputAttributes: Seq[Attribute] = {
       cond match {
-        case je: JoinOnEq =>
-          // Remove join key duplication here
-          val dups = je.duplicateKeys
-          inputAttributes.filter(x => !dups.contains(x))
-        case _ => inputAttributes
+        case ju: ResolvedJoinUsing =>
+          val joinKeys = ju.keys
+          val otherAttributes = inputAttributes.filter { x =>
+            !joinKeys.exists(jk => jk.name == x.name)
+          }
+          // report join keys (merged) and other attributes
+          joinKeys ++ otherAttributes
+        case _ =>
+          // Report including duplicated name columns
+          inputAttributes
       }
     }
 
     def withCond(cond: JoinCriteria): Join = this.copy(cond = cond)
   }
+
   sealed abstract class JoinType(val symbol: String)
 // Exact match (= equi join)
   case object InnerJoin extends JoinType("J")
@@ -452,19 +726,52 @@ object LogicalPlan {
 // Where clause specifies join criteria
   case object ImplicitJoin extends JoinType("J")
 
-  sealed trait SetOperation extends Relation {
+  sealed trait SetOperation extends Relation with LogSupport {
     override def children: Seq[Relation]
+
+    override def outputAttributes: Seq[Attribute] = mergeOutputAttributes
+    protected def mergeOutputAttributes: Seq[Attribute] = {
+      // Collect all input attributes
+      val outputAttributes: Seq[Seq[Attribute]] = children.flatMap(_.outputAttributes.map(_.inputColumns))
+
+      // Transpose a set of relation columns into a list of same columns
+      // relations: (Ra(a1, a2, ...), Rb(b1, b2, ...))
+      // column lists: ((a1, b1, ...), (a2, b2, ...)
+      val sameColumnList = outputAttributes.transpose
+      sameColumnList.map { columns =>
+        val head       = columns.head
+        val qualifiers = columns.map(_.qualifier).distinct
+        val col = MultiSourceColumn(
+          inputs = columns.toSeq,
+          qualifier = {
+            // If all of the qualifiers are the same, use it.
+            if (qualifiers.size == 1) {
+              qualifiers.head
+            } else {
+              None
+            }
+          },
+          None
+        )
+          // In set operations, if different column names are merged into one column, the first column name will be used
+          .withAlias(head.name)
+        col
+      }.toSeq
+    }
   }
-  case class Intersect(relations: Seq[Relation], nodeLocation: Option[NodeLocation]) extends SetOperation {
+
+  case class Intersect(
+      relations: Seq[Relation],
+      nodeLocation: Option[NodeLocation]
+  ) extends SetOperation {
     override def children: Seq[Relation] = relations
     override def sig(config: QuerySignatureConfig): String = {
       s"IX(${relations.map(_.sig(config)).mkString(",")})"
     }
     override def inputAttributes: Seq[Attribute] =
-      relations.head.inputAttributes
-    override def outputAttributes: Seq[Attribute] =
-      relations.head.outputAttributes
+      relations.flatMap(_.inputAttributes)
   }
+
   case class Except(left: Relation, right: Relation, nodeLocation: Option[NodeLocation]) extends SetOperation {
     override def children: Seq[Relation] = Seq(left, right)
     override def sig(config: QuerySignatureConfig): String = {
@@ -473,7 +780,11 @@ object LogicalPlan {
     override def inputAttributes: Seq[Attribute]  = left.inputAttributes
     override def outputAttributes: Seq[Attribute] = left.outputAttributes
   }
-  case class Union(relations: Seq[Relation], nodeLocation: Option[NodeLocation]) extends SetOperation {
+
+  case class Union(
+      relations: Seq[Relation],
+      nodeLocation: Option[NodeLocation]
+  ) extends SetOperation {
     override def children: Seq[Relation] = relations
     override def toString = {
       s"Union(${relations.mkString(",")})"
@@ -482,17 +793,23 @@ object LogicalPlan {
       val in = relations.map(_.sig(config)).mkString(",")
       s"U(${in})"
     }
-    override def inputAttributes: Seq[Attribute] =
-      relations.head.inputAttributes
-    override def outputAttributes: Seq[Attribute] =
-      relations.head.outputAttributes
+    override def inputAttributes: Seq[Attribute] = {
+      relations.flatMap(_.inputAttributes)
+    }
   }
 
   case class Unnest(columns: Seq[Expression], withOrdinality: Boolean, nodeLocation: Option[NodeLocation])
       extends Relation {
-    override def children: Seq[LogicalPlan]       = Seq.empty
-    override def inputAttributes: Seq[Attribute]  = Seq.empty // TODO
-    override def outputAttributes: Seq[Attribute] = Seq.empty // TODO
+    override def children: Seq[LogicalPlan]      = Seq.empty
+    override def inputAttributes: Seq[Attribute] = Seq.empty // TODO
+    override def outputAttributes: Seq[Attribute] = {
+      columns.map {
+        case arr: ArrayConstructor =>
+          ResolvedAttribute(UUID.randomUUID().toString, arr.elementType, None, None, None)
+        case other =>
+          SingleColumn(other, None, other.nodeLocation)
+      }
+    }
     override def sig(config: QuerySignatureConfig): String =
       s"Un[${columns.length}]"
   }
@@ -511,7 +828,7 @@ object LogicalPlan {
       nodeLocation: Option[NodeLocation]
   ) extends UnaryRelation {
     override def outputAttributes: Seq[Attribute] =
-      columnAliases.map(x => UnresolvedAttribute(x.value, None))
+      columnAliases.map(x => UnresolvedAttribute(Some(tableAlias.value), x.value, None))
     override def sig(config: QuerySignatureConfig): String =
       s"LV(${child.sig(config)})"
   }

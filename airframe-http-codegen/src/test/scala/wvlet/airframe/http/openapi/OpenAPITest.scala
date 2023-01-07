@@ -13,9 +13,12 @@
  */
 package wvlet.airframe.http.openapi
 import example.openapi.{OpenAPIEndpointExample, OpenAPIRPCExample, OpenAPISmallExample}
+
 import io.swagger.v3.parser.OpenAPIV3Parser
 import wvlet.airframe.http.Router
 import wvlet.airframe.http.codegen.HttpCodeGenerator
+import wvlet.airframe.http.openapi.OpenAPI.Parameter
+import wvlet.airframe.http.openapi.OpenAPI.Schema
 import wvlet.airspec.AirSpec
 
 /**
@@ -145,6 +148,7 @@ class OpenAPITest extends AirSpec {
         |          format: float
         |        x5:
         |          type: number
+        |          default: '1.0'
         |          format: double
         |        x6:
         |          type: array
@@ -174,8 +178,9 @@ class OpenAPITest extends AirSpec {
     )
 
     fragments.foreach { x =>
-      debug(s"checking\n${x}")
-      yaml.contains(x) shouldBe true
+      if (!yaml.contains(x)) {
+        fail(s"Missing YAML fragment for:\n${x}")
+      }
     }
   }
 
@@ -283,23 +288,6 @@ class OpenAPITest extends AirSpec {
         |            format: int32
         |        - name: name
         |          in: path
-        |          required: true
-        |          schema:
-        |            type: string""".stripMargin,
-      """  /v1/get3/{id}:
-        |    get:
-        |      summary: get3
-        |      description: get3
-        |      operationId: get3
-        |      parameters:
-        |        - name: id
-        |          in: path
-        |          required: true
-        |          schema:
-        |            type: integer
-        |            format: int32
-        |        - name: p1
-        |          in: query
         |          required: true
         |          schema:
         |            type: string""".stripMargin,
@@ -533,8 +521,53 @@ class OpenAPITest extends AirSpec {
     //      .setContents(new java.awt.datatransfer.StringSelection(yaml), null)
 
     fragments.foreach { x =>
-      debug(x)
-      yaml.contains(x) shouldBe true
+      try {
+        yaml.contains(x) shouldBe true
+      } catch {
+        case e: Throwable =>
+          fail(s"Missing YAML fragment for:\n${x}")
+      }
+    }
+
+    test("optional method parameter") {
+      if (isScala3) {
+        pending("Need to find default method parameter in Scala 3")
+      }
+
+      val methodOptParam = Seq(
+        """  /v1/get3/{id}:
+          |    get:
+          |      summary: get3
+          |      description: get3
+          |      operationId: get3
+          |      parameters:
+          |        - name: id
+          |          in: path
+          |          required: true
+          |          schema:
+          |            type: integer
+          |            format: int32
+          |        - name: p1
+          |          in: query
+          |          required: true
+          |          schema:
+          |            type: string
+          |        - name: p2
+          |          in: query
+          |          required: false
+          |          schema:
+          |            type: string
+          |            default: foo""".stripMargin
+      )
+
+      methodOptParam.foreach { x =>
+        try {
+          yaml.contains(x) shouldBe true
+        } catch {
+          case e: Throwable =>
+            fail(s"Missing YAML fragment for:\n${x}")
+        }
+      }
     }
 
     // Parsing test

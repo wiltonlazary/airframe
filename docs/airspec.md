@@ -78,24 +78,25 @@ This `test` syntax is useful for writing nested tests or customizing the design 
 
 AirSpec supports basic assertions listed below:
 
-|syntax               | meaning |
-|-------------------------|----------|
-|`assert(x == y)`         | check x equals to y |
-|`assertEquals(a, b, delta)` | check the equality of Float (or Double) values by allowing some delta difference |
-|`intercept[E] { ... }`   | Catch an exception of type `E` to check an expected exception is thrown |
-|`x shouldBe y`           | check x == y. This supports matching collections like Seq, Array (with deepEqual) |
-|`x shouldNotBe y`        | check x != y |
-|`x shouldNotBe null`     | shouldBe, shouldNotBe supports null check|
-|`x shouldBe defined`     | check x.isDefined == true, when x is Option or Seq |
-|`x shouldBe empty`       | check x.isEmpty == true, when x is Option or Seq |
-|`x shouldBeTheSameInstanceAs y` | check x eq y; x and y are the same object instance |
-|`x shouldNotBeTheSameInstanceAs y` | check x ne y; x and y should not be the same instance |
-|`fail("reason")`         | fail the test if this code path should not be reached  |
-|`ignore("reason")`       | ignore this test execution.  |
-|`cancel("reason")`       | cancel the test (e.g., due to set up failure) |
-|`pending`                | pending the test execution (e.g., when hitting an unknown issue) |
-|`pendingUntil("reason")` | pending until fixing some blocking issues|
-|`skip("reason")`         | Skipping unnecessary tests (e.g., tests that cannot be supported in Scala.js) |
+| syntax                             | meaning                                                                           |
+|------------------------------------|-----------------------------------------------------------------------------------|
+| `assert(x == y)`                   | check x equals to y                                                               |
+| `assertEquals(a, b, delta)`        | check the equality of Float (or Double) values by allowing some delta difference  |
+| `intercept[E] { ... }`             | Catch an exception of type `E` to check an expected exception is thrown           |
+| `x shouldBe y`                     | check x == y. This supports matching collections like Seq, Array (with deepEqual) |
+| `x shouldNotBe y`                  | check x != y                                                                      |
+| `x shouldNotBe null`               | shouldBe, shouldNotBe supports null check                                         |
+| `x shouldBe defined`               | check x.isDefined == true, when x is Option or Seq                                |
+| `x shouldBe empty`                 | check x.isEmpty == true, when x is Option or Seq                                  |
+| `x shouldBeTheSameInstanceAs y`    | check x eq y; x and y are the same object instance                                |
+| `x shouldNotBeTheSameInstanceAs y` | check x ne y; x and y should not be the same instance                             |
+| `x shouldMatch { case .. => }`     | check x matches given patterns                                                    | 
+| `fail("reason")`                   | fail the test if this code path should not be reached                             |
+| `ignore("reason")`                 | ignore this test execution.                                                       |
+| `cancel("reason")`                 | cancel the test (e.g., due to set up failure)                                     |
+| `pending("reason")`                | pending the test execution (e.g., when hitting an unknown issue)                  |
+| `pendingUntil("reason")`           | pending until fixing some blocking issues                                         |
+| `skip("reason")`                   | Skipping unnecessary tests (e.g., tests that cannot be supported in Scala.js)     |
 
 AirSpec is designed to use pure Scala syntax as much as possible so as not to introduce any complex DSLs, which are usually hard to remember.
 
@@ -140,6 +141,11 @@ class MyTest extends AirSpec {
     a shouldBeTheSameInstanceAs a1
     a shouldBe b
     a shouldNotBeTheSameInstanceAs b
+    
+    // Patten matcher
+    Seq(1, 2) shouldMatch {
+      case Seq(1, _) => // ok 
+    }
   }
 }
 ```
@@ -151,17 +157,24 @@ AirSpec supports pattern matching for running only specific tests:
 $ sbt
 
 > test                                   # Run all tests
-> testOnly -- (pattern)                  # Run all test matching the pattern (class name or test name)
-> testOnly -- (class pattern)*(pattern)  # Search both class and test names
+> testOnly -- (pattern)                  # Run all test matching the pattern 
+> testOnly -- (pattern)/(pattern)        # Run nested tests matching the nested pattern (/ is a dlimiter)
 
 # sbt's default test functionalities:
 > testQuick                              # Run only previously failed test specs
 > testOnly (class name)                  # Run tests only in specific classes matching a pattern (wildcard is supported)
 ```
 
-`pattern` is used for partial matching with test names. It also supports wildcard (`*`) and regular expressions (experimental).
-Basically AirSpec will find matches from the list of all `(test class full name):(test function name)` strings.
-Cases of test names will be ignored in the search.
+The `pattern` is a slash (`/`)-separated test names. You can also use wildcard (`*`) and regular expressions in the pattern. If the test cases are nested, AirSpec represents test names as `(parent test name)/(child test name)/...`. so you can run specific nested test with patterns like:   
+
+```scala
+test("test A") { // Matches with 'test A'. All child tests will be executed
+  test("1") { ... }  // Matches with 'test A/1' 
+  test("2") { ... } // Matches with 'test A/2'
+}
+```
+
+Test names will be checked as case-insensitive partial match, so you only need to specify substrings of test names like `A`, `A/1`, 'a/2', etc. to simplify the pattern matching. 
 
 ![image](https://wvlet.org/airframe/img/airspec/airspec.png)
 

@@ -6,6 +6,48 @@ title: Release Notes
 
 Airframe uses YY.MM.patch versioning scheme, so the version numbers match with the release year and month.   
 
+## 22.12.6
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.12.6)
+
+## 22.12.5
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.12.5)
+
+## 22.12.4
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.12.4)
+
+## 22.12.3
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.12.3)
+
+## 22.12.2
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.12.2)
+
+## 22.12.1
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.12.1)
+
+## 22.12.0
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.12.0)
+
+## 22.11.4
+
+Upgrade to Scala.js 1.12.0
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.11.4)
+
+## 22.11.3
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.11.3)
+
+## 22.11.2
+
+[Release notes](https://github.com/wvlet/airframe/releases/tag/v22.11.2)
+
 ## 22.11.1
 
 [Release notes](https://github.com/wvlet/airframe/releases/tag/v22.11.1)

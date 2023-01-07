@@ -118,11 +118,26 @@ object SQLGenerator extends LogSupport {
     if (containsDistinctPlan(context)) {
       b += "DISTINCT"
     }
-    b += (s.selectItems.map(printExpression).mkString(", "))
+    b += (s.selectItems.map(printSelectItem).mkString(", "))
 
     findNonEmpty(nonFilterChild).map { f =>
       b += "FROM"
-      b += printRelation(f)
+      f match {
+        case _: Selection =>
+          b += s"(${printRelation(f)})"
+        case _: SetOperation =>
+          b += s"(${printRelation(f)})"
+        case _: Limit =>
+          b += s"(${printRelation(f)})"
+        case _: Filter =>
+          b += s"(${printRelation(f)})"
+        case _: Sort =>
+          b += s"(${printRelation(f)})"
+        case _: Distinct =>
+          b += s"(${printRelation(f)})"
+        case _ =>
+          b += printRelation(f)
+      }
     }
 
     val filterSet = s match {
@@ -186,7 +201,7 @@ object SQLGenerator extends LogSupport {
       case TableRef(t, _) =>
         printExpression(t)
       case t: TableScan =>
-        t.table.fullName
+        t.fullName
       case Limit(in, l, _) =>
         val s = seqBuilder
         s += printRelation(in, context)
@@ -212,12 +227,17 @@ object SQLGenerator extends LogSupport {
         }
       case Join(joinType, left, right, cond, _) =>
         val l = printRelation(left)
-        val r = printRelation(right)
+        val r = right match {
+          case _: Selection    => s"(${printRelation(right)})"
+          case _: SetOperation => s"(${printRelation(right)})"
+          case _               => printRelation(right)
+        }
         val c = cond match {
-          case NaturalJoin(_)        => ""
-          case JoinUsing(columns, _) => s" USING (${columns.map(_.sqlExpr).mkString(", ")})"
-          case JoinOn(expr, _)       => s" ON ${printExpression(expr)}"
-          case JoinOnEq(keys, _)     => s" ON ${printExpression(Expression.concatWithEq(keys))}"
+          case NaturalJoin(_)                => ""
+          case JoinUsing(columns, _)         => s" USING (${columns.map(_.sqlExpr).mkString(", ")})"
+          case ResolvedJoinUsing(columns, _) => s" USING (${columns.map(_.fullName).mkString(", ")})"
+          case JoinOn(expr, _)               => s" ON ${printExpression(expr)}"
+          case JoinOnEq(keys, _)             => s" ON ${printExpression(Expression.concatWithEq(keys))}"
         }
         joinType match {
           case InnerJoin      => s"${l} JOIN ${r}${c}"
@@ -344,6 +364,15 @@ object SQLGenerator extends LogSupport {
     }
   }
 
+  def printSelectItem(e: Expression): String = {
+    e match {
+      case a: ResolvedAttribute =>
+        a.sqlExpr
+      case other =>
+        printExpression(other)
+    }
+  }
+
   def printExpression(e: Expression): String = {
     e match {
       case i: Identifier =>
@@ -354,15 +383,17 @@ object SQLGenerator extends LogSupport {
         printExpression(k)
       case ParenthesizedExpression(expr, _) =>
         s"(${printExpression(expr)})"
-      case SingleColumn(ex, alias, _, _) =>
-        val col = printExpression(ex)
-        alias
-          .map(x => s"${col} AS ${printExpression(x)}")
-          .getOrElse(col)
-      case AllColumns(prefix, _) =>
+      case a: Alias =>
+        val e = printExpression(a.expr)
+        s"${e} AS ${a.name}"
+      case SingleColumn(ex, _, _) =>
+        printExpression(ex)
+      case m: MultiSourceColumn =>
+        m.sqlExpr
+      case AllColumns(prefix, _, _) =>
         prefix.map(p => s"${p}.*").getOrElse("*")
       case a: Attribute =>
-        a.name
+        a.fullName
       case SortItem(key, ordering, nullOrdering, _) =>
         val k  = printExpression(key)
         val o  = ordering.map(x => s" ${x}").getOrElse("")

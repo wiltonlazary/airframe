@@ -49,12 +49,12 @@ object ParquetQueryPlanner extends LogSupport {
       val queryPlan   = ParquetQueryPlan(sql)
 
       logicalPlan match {
-        case Project(input, Seq(AllColumns(None, _)), _) =>
+        case Project(input, Seq(AllColumns(None, _, _)), _) =>
           parseRelation(input, queryPlan).selectAllColumns
         case Project(input, selectItems, _) =>
           val columns = selectItems.map {
-            case SingleColumn(id: Identifier, _, _, _) =>
-              id.value
+            case a: wvlet.airframe.sql.model.Attribute =>
+              a.name
             case other =>
               throw new IllegalArgumentException(s"Invalid select item: ${other}")
           }

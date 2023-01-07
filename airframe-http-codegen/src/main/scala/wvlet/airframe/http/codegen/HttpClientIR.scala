@@ -19,10 +19,10 @@ import wvlet.airframe.http.{HttpMethod, Router}
 import wvlet.airframe.http.codegen.RouteAnalyzer.RouteAnalysisResult
 import wvlet.airframe.http.codegen.client.HttpClientGenerator
 import wvlet.airframe.http.codegen.client.HttpClientGenerator.fullTypeNameOf
-import wvlet.airframe.http.router.Route
 import wvlet.airframe.rx.{Rx, RxStream}
 import wvlet.airframe.surface.{GenericSurface, HigherKindedTypeSurface, MethodParameter, Parameter, Surface, TypeName}
 import wvlet.log.LogSupport
+import wvlet.airframe.http.router.{Route, HttpRequestMapper}
 
 /**
   * Generate an intermediate representation (IR) of Scala HTTP client code from a given airframe-http interface
@@ -301,7 +301,7 @@ object HttpClientIR extends LogSupport {
       var requestModelClassDef: Option[ClientRequestModelClassDef] = None
 
       if (httpClientCallInputs.isEmpty) {
-        if (route.method == HttpMethod.POST) {
+        if (route.httpMethod == HttpMethod.POST) {
           // For RPC calls without any input, embed an empty json
           clientCallParams += "Map.empty[String, Any]"
           typeArgBuilder += Surface.of[Map[String, Any]]
@@ -370,7 +370,7 @@ object HttpClientIR extends LogSupport {
       val typeArgs = typeArgBuilder.result()
 
       ClientMethodDef(
-        httpMethod = route.method,
+        httpMethod = route.httpMethod,
         isOpsRequest = typeArgs.size > 1,
         name = name,
         typeArgs = typeArgs,
