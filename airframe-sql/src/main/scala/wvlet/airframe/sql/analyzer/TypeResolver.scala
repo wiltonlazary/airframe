@@ -85,14 +85,7 @@ object TypeResolver extends LogSupport {
         val resolvedGroupingKeys: List[GroupingKey] = groupingKeys.map {
           case k @ GroupingKey(LongLiteral(i, _), _) if i <= selectItems.length =>
             // Use a simpler form of attributes
-            val keyItem = selectItems(i.toInt - 1) match {
-              case SingleColumn(expr, _, _) =>
-                expr
-              case Alias(_, _, expr, _) =>
-                expr
-              case other =>
-                other
-            }
+            val keyItem = resolveIndex(i.toInt - 1, selectItems)
             changed = true
             GroupingKey(keyItem, k.nodeLocation)
           case other =>
@@ -103,6 +96,19 @@ object TypeResolver extends LogSupport {
         } else {
           a
         }
+    }
+
+    private def resolveIndex(index: Int, inputs: Seq[Attribute]): Expression = {
+      inputs(index) match {
+        case a: AllColumns =>
+          resolveIndex(index, a.inputColumns)
+        case SingleColumn(expr, _, _) =>
+          expr
+        case Alias(_, _, expr, _) =>
+          expr
+        case other =>
+          other
+      }
     }
   }
 
@@ -135,15 +141,21 @@ object TypeResolver extends LogSupport {
     def apply(context: AnalyzerContext): PlanRewriter = { case s @ Sort(child, sortItems, _) =>
       val resolvedSortItems = sortItems.map {
         case sortItem @ SortItem(LongLiteral(i, _), _, _, _) =>
-          val sortKey = child.outputAttributes(i.toInt - 1) match {
-            case a: Attribute =>
-              toResolvedAttribute(a.name, a)
-            case other => other
-          }
+          val sortKey = resolveIndex(i.toInt - 1, child.outputAttributes)
           sortItem.copy(sortKey = sortKey)
         case other => other
       }
       s.copy(orderBy = resolvedSortItems)
+    }
+
+    private def resolveIndex(index: Int, inputs: Seq[Attribute]): Expression = {
+      inputs(index) match {
+        case a: AllColumns =>
+          resolveIndex(index, a.inputColumns)
+        case a: Attribute =>
+          toResolvedAttribute(a.name, a)
+        case other => other
+      }
     }
   }
 
@@ -243,15 +255,23 @@ object TypeResolver extends LogSupport {
       case j @ Join(joinType, left, right, u @ JoinOn(Eq(leftKey, rightKey, _), _), _) =>
         val resolvedJoin =
           Join(joinType, resolveRelation(context, left), resolveRelation(context, right), u, j.nodeLocation)
-        val resolvedJoinKeys: Seq[Expression] = Seq(leftKey, rightKey).flatMap { k =>
-          findMatchInInputAttributes(context, k, resolvedJoin.inputAttributes) match {
-            case Nil =>
-              throw SQLErrorCode.ColumnNotFound.newException(
-                s"join key column: ${k.sqlExpr} is not found",
-                k.nodeLocation
-              )
-            case other =>
-              other
+        val resolvedJoinKeys: Seq[Expression] = Seq(leftKey, rightKey).map { k =>
+          k.transformUpExpression { expr =>
+            findMatchInInputAttributes(context, expr, resolvedJoin.inputAttributes) match {
+              case Nil =>
+                throw SQLErrorCode.ColumnNotFound.newException(
+                  s"join key column: ${k.sqlExpr} is not found",
+                  k.nodeLocation
+                )
+              case other =>
+                if (other.size > 1) {
+                  throw SQLErrorCode.SyntaxError.newException(
+                    s"ambiguous join condition: ${expr} matches with [${other.mkString(", ")}]",
+                    k.nodeLocation
+                  )
+                }
+                other.head
+            }
           }
         }
         val updated = resolvedJoin.withCond(JoinOnEq(resolvedJoinKeys, u.expr.nodeLocation))

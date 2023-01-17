@@ -283,6 +283,13 @@ class TypeResolverTest extends AirSpec with ResolverTestHelper {
       }
     }
 
+    test("group by index with select *") {
+      val p = analyze("select *, count(*) from (select id from A) group by 1")
+      p shouldMatch { case Aggregate(_, _, List(GroupingKey(c, _)), _, _) =>
+        c shouldBe ra1.copy(nodeLocation = c.nodeLocation)
+      }
+    }
+
     test("group by index of column with alias") {
       val p = analyze("select id as i, count(*) from A group by 1")
       p shouldMatch { case Aggregate(_, _, List(GroupingKey(SingleColumn(`ra1`, _, _), _)), _, _) =>
@@ -541,6 +548,16 @@ class TypeResolverTest extends AirSpec with ResolverTestHelper {
         c1 shouldBe ra1.withQualifier("A")
         c2 shouldBe rb1.withQualifier("B")
         c3 shouldBe rc1.withQualifier("C")
+      }
+    }
+
+    test("j9: join on with function") {
+      val p = analyze("select A.id from A join B on A.id = substr(B.id, 0, 2)")
+      p shouldMatch { case Project(Join(_, _, _, JoinOnEq(Seq(c1, c2), _), _), _, _) =>
+        c1 shouldBe ra1.withQualifier("A")
+        c2 shouldMatch { case FunctionCall("substr", args, false, None, None, _) =>
+          args(0) shouldBe rb1.withQualifier("B")
+        }
       }
     }
   }
@@ -820,6 +837,14 @@ class TypeResolverTest extends AirSpec with ResolverTestHelper {
       val p = analyze("""SELECT A.id FROM A INNER JOIN B on A.id = B.id ORDER BY B.id DESC""".stripMargin)
       p.asInstanceOf[Sort].orderBy.toList shouldMatch { case List(SortItem(c1, Some(Descending), None, _)) =>
         c1 shouldBe rb1.withQualifier("B")
+      }
+    }
+
+    test("resolve order by index with select *") {
+      val p = analyze("select * from A order by 1")
+      p.asInstanceOf[Sort].orderBy.toList shouldMatch { case List(SortItem(c, None, None, _)) =>
+        c.attributeName shouldBe "id"
+        c.dataType shouldBe DataType.LongType
       }
     }
   }

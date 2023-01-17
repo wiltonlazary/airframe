@@ -2,7 +2,7 @@ import xerial.sbt.pack.PackPlugin.publishPackArchiveTgz
 
 val SCALA_2_12          = "2.12.17"
 val SCALA_2_13          = "2.13.10"
-val SCALA_3             = "3.2.1"
+val SCALA_3             = "3.2.2"
 val uptoScala2          = SCALA_2_13 :: SCALA_2_12 :: Nil
 val targetScalaVersions = SCALA_3 :: uptoScala2
 
@@ -20,7 +20,7 @@ val JS_JAVA_TIME_VERSION            = "1.0.0"
 val SCALAJS_DOM_VERSION             = "2.3.0"
 val FINAGLE_VERSION                 = "22.12.0"
 val FLUENCY_VERSION                 = "2.7.0"
-val GRPC_VERSION                    = "1.51.1"
+val GRPC_VERSION                    = "1.52.1"
 val JMH_VERSION                     = "1.36"
 val JAVAX_ANNOTATION_API_VERSION    = "1.3.2"
 val PARQUET_VERSION                 = "1.12.3"
@@ -672,7 +672,7 @@ lazy val httpCodeGen =
       packExcludeLibJars := Seq("airspec_2.12", "airspec_2.13", "airspec_3"),
       libraryDependencies ++= Seq(
         // Use swagger-parser only for validating YAML format in tests
-        "io.swagger.parser.v3" % "swagger-parser" % "2.1.9" % Test,
+        "io.swagger.parser.v3" % "swagger-parser" % "2.1.10" % Test,
         // Swagger includes dependency to SLF4J, so redirect slf4j logs to airframe-log
         "org.slf4j" % "slf4j-jdk14" % SLF4J_VERSION % Test,
         // For gRPC route scanner test
@@ -691,7 +691,7 @@ lazy val netty =
       name        := "airframe-http-netty",
       description := "Airframe HTTP Netty backend",
       libraryDependencies ++= Seq(
-        "io.netty" % "netty-all" % "4.1.86.Final"
+        "io.netty" % "netty-all" % "4.1.87.Final"
       )
     )
     .dependsOn(http.jvm, rx.jvm)
