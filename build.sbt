@@ -12,15 +12,15 @@ val targetScalaVersions = SCALA_3 :: uptoScala2
 val AIRSPEC_VERSION                 = "22.12.5"
 val SCALACHECK_VERSION              = "1.17.0"
 val MSGPACK_VERSION                 = "0.9.3"
-val SCALA_PARSER_COMBINATOR_VERSION = "2.1.1"
-val SQLITE_JDBC_VERSION             = "3.40.0.0"
+val SCALA_PARSER_COMBINATOR_VERSION = "2.2.0"
+val SQLITE_JDBC_VERSION             = "3.40.1.0"
 val SLF4J_VERSION                   = "2.0.6"
 val JS_JAVA_LOGGING_VERSION         = "1.0.0"
 val JS_JAVA_TIME_VERSION            = "1.0.0"
 val SCALAJS_DOM_VERSION             = "2.3.0"
 val FINAGLE_VERSION                 = "22.12.0"
 val FLUENCY_VERSION                 = "2.7.0"
-val GRPC_VERSION                    = "1.52.1"
+val GRPC_VERSION                    = "1.52.0"
 val JMH_VERSION                     = "1.36"
 val JAVAX_ANNOTATION_API_VERSION    = "1.3.2"
 val PARQUET_VERSION                 = "1.12.3"
@@ -599,7 +599,7 @@ lazy val jdbc =
       description := "JDBC connection pool service",
       libraryDependencies ++= Seq(
         "org.xerial"     % "sqlite-jdbc" % SQLITE_JDBC_VERSION,
-        "org.postgresql" % "postgresql"  % "42.5.1",
+        "org.postgresql" % "postgresql"  % "42.5.3",
         "com.zaxxer"     % "HikariCP"    % "5.0.1",
         // For routing slf4j log to airframe-log
         "org.slf4j" % "slf4j-jdk14" % SLF4J_VERSION
@@ -672,7 +672,7 @@ lazy val httpCodeGen =
       packExcludeLibJars := Seq("airspec_2.12", "airspec_2.13", "airspec_3"),
       libraryDependencies ++= Seq(
         // Use swagger-parser only for validating YAML format in tests
-        "io.swagger.parser.v3" % "swagger-parser" % "2.1.10" % Test,
+        "io.swagger.parser.v3" % "swagger-parser" % "2.1.11" % Test,
         // Swagger includes dependency to SLF4J, so redirect slf4j logs to airframe-log
         "org.slf4j" % "slf4j-jdk14" % SLF4J_VERSION % Test,
         // For gRPC route scanner test
@@ -851,7 +851,7 @@ def sqlRefLib = { scalaVersion: String =>
       // Include Spark just as a reference implementation
       "org.apache.spark" %% "spark-sql" % "3.3.1" % Test,
       // Include Trino as a reference implementation
-      "io.trino" % "trino-main" % "405" % Test
+      "io.trino" % "trino-main" % "406" % Test
     )
   } else {
     Seq.empty
@@ -870,9 +870,9 @@ lazy val parquet =
         "org.apache.hadoop"  % "hadoop-client"  % "3.3.4" % Provided,
         // For S3 support
         "org.apache.hadoop"      % "hadoop-aws" % "3.3.4"    % Provided,
-        "software.amazon.awssdk" % "auth"       % "2.17.293" % Provided,
+        "software.amazon.awssdk" % "auth"       % "2.17.295" % Provided,
         // For Apple Silicon (M1)
-        "org.xerial.snappy"  % "snappy-java"  % "1.1.8.4",
+        "org.xerial.snappy"  % "snappy-java"  % "1.1.9.1",
         "org.slf4j"          % "slf4j-jdk14"  % SLF4J_VERSION   % Optional,
         "org.apache.parquet" % "parquet-avro" % PARQUET_VERSION % Test
       )

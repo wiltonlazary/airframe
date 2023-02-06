@@ -722,7 +722,8 @@ object LogicalPlan {
       right: Relation,
       cond: JoinCriteria,
       nodeLocation: Option[NodeLocation]
-  ) extends Relation {
+  ) extends Relation
+      with LogSupport {
     override def modelName: String          = joinType.toString
     override def children: Seq[LogicalPlan] = Seq(left, right)
     override def sig(config: QuerySignatureConfig): String = {
@@ -736,9 +737,12 @@ object LogicalPlan {
       cond match {
         case ju: ResolvedJoinUsing =>
           val joinKeys = ju.keys
-          val otherAttributes = inputAttributes.filter { x =>
-            !joinKeys.exists(jk => jk.name == x.name)
-          }
+          val otherAttributes = inputAttributes
+            // Expand AllColumns here
+            .flatMap(_.outputColumns)
+            .filter { x =>
+              !joinKeys.exists(jk => jk.name == x.name)
+            }
           // report join keys (merged) and other attributes
           joinKeys ++ otherAttributes
         case _ =>
@@ -771,7 +775,7 @@ object LogicalPlan {
     override def outputAttributes: Seq[Attribute] = mergeOutputAttributes
     protected def mergeOutputAttributes: Seq[Attribute] = {
       // Collect all input attributes
-      val outputAttributes: Seq[Seq[Attribute]] = children.flatMap(_.outputAttributes.map(_.inputColumns))
+      val outputAttributes: Seq[Seq[Attribute]] = children.map(_.outputAttributes.flatMap(_.inputColumns))
 
       // Transpose a set of relation columns into a list of same columns
       // relations: (Ra(a1, a2, ...), Rb(b1, b2, ...))
