@@ -14,9 +14,8 @@
 package wvlet.airframe.sql.analyzer
 
 import wvlet.airframe.sql.SQLErrorCode
-import wvlet.airframe.sql.model.Expression.SingleColumn
-import wvlet.airframe.sql.model.{CTERelationRef, LogicalPlan}
-import wvlet.airframe.sql.model.LogicalPlan.{Project, Query, Relation, With, WithQuery}
+import wvlet.airframe.sql.model.LogicalPlan
+import wvlet.airframe.sql.model.LogicalPlan._
 import wvlet.log.LogSupport
 
 /**
@@ -46,7 +45,7 @@ object CTEResolver extends LogSupport {
             }
             // Add a projection for renaming columns
             val selectItems = resolvedQuery.outputAttributes.zip(aliases).map { case (col, alias) =>
-              SingleColumn(col, None, col.nodeLocation).withAlias(alias.value)
+              col.withAlias(alias.value)
             }
             Project(resolvedQuery, selectItems, resolvedQuery.nodeLocation)
         }

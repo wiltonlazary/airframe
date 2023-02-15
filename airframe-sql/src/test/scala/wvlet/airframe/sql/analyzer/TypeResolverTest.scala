@@ -102,6 +102,25 @@ class TypeResolverTest extends AirSpec with ResolverTestHelper {
     )
   }
 
+  test("resolve double-quoted identifies") {
+    val p1 = analyze("select id from \"A\"")
+    p1.outputAttributes shouldBe List(ra1)
+
+    val p2 = analyze("select id from \"default\".\"A\"")
+    p2.outputAttributes shouldBe List(ra1)
+
+    val p3 = analyze("select \"id\" from \"default\".\"A\"")
+    p3.outputAttributes shouldBe List(ra1)
+
+    val p4 = analyze("select \"A\".\"id\" from \"default\".\"A\"")
+    p4.outputAttributes shouldBe List(ra1.withQualifier("A"))
+
+    val p5 = analyze("select \"default\".\"A\".\"id\" from \"default\".\"A\"")
+    p5.outputAttributes shouldBe List(
+      ra1.withQualifier("default.A")
+    )
+  }
+
   test("resolveRelation") {
 
     test("resolve a filter") {
@@ -965,5 +984,18 @@ class TypeResolverTest extends AirSpec with ResolverTestHelper {
                       |    (select name from B) t2
                       |    on t1.id = t2.name
                       |)""".stripMargin)
+  }
+
+  test("unresolve AllColumns after rewrite") {
+    val sql = "select * from A"
+    val p   = analyze(sql)
+    // Drop some column by adding a projection
+    val rewritten = p.transformOnce { case t: TableScan =>
+      Project(t, Seq(ra1), None)
+    }
+    val resolved = TypeResolver.resolve(defaultAnalyzerContext, rewritten)
+    resolved shouldMatch { case Project(_, List(AllColumns(None, Some(List(c)), _)), _) =>
+      c shouldBe ra1
+    }
   }
 }

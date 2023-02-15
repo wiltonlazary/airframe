@@ -165,4 +165,25 @@ class SQLGeneratorTest extends AirSpec {
     sql shouldBe "select id, country, count(*) from a group by 1, 2"
   }
 
+  test("aliased relation") {
+    val resolvedPlan =
+      SQLAnalyzer.analyze("select * from A as t1", "default", demoCatalog)
+    val sql = SQLGenerator.print(resolvedPlan).toLowerCase
+    sql shouldBe "select * from a as t1"
+  }
+
+  test("CTE with column names") {
+    val resolvedPlan =
+      SQLAnalyzer.analyze("with t1 (xid) as (select id as pid from A) select xid from t1", "default", demoCatalog)
+    val sql = SQLGenerator.print(resolvedPlan).toLowerCase
+    sql shouldBe "with t1 as (select id as xid from (select id as pid from a)) select xid from t1"
+  }
+
+  test("join with sub query at left side") {
+    val resolvedPlan =
+      SQLAnalyzer.analyze("select * from (select * from A) inner join A using (id)", "default", demoCatalog)
+
+    val sql = SQLGenerator.print(resolvedPlan).toLowerCase
+    sql shouldBe "select * from (select * from a) join a using (id)"
+  }
 }
